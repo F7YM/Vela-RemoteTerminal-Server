@@ -16,6 +16,7 @@ import time
 import uuid
 import subprocess
 import urllib.request
+import re
 import threading
 import select
 try:
@@ -1195,6 +1196,9 @@ def ssh_output():
         session["buffer"].clear()
 
     text = data.decode('utf-8', errors='replace')
+    # 过滤 ANSI 转义序列
+    text = re.sub(r'\x1b\[[0-9;?]*[a-zA-Z]', '', text)
+    text = re.sub(r'\x1b\][0-9;?]*[^\x07]*\x07', '', text)
     return jsonify({"status": "ok", "output": text})
 
 
