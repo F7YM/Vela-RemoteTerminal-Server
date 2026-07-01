@@ -1206,7 +1206,6 @@ def ssh_output():
 
     with session["lock"]:
         data = bytes(session["buffer"])
-        session["buffer"].clear()
 
     text = data.decode('utf-8', errors='replace')
     # 过滤 ANSI 转义序列: CSI (\x1b[ + 参数 + 终结符) 和 OSC (\x1b]...\x07 或 \x1b]...\x1b\\)
