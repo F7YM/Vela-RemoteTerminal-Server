@@ -1196,9 +1196,11 @@ def ssh_output():
         session["buffer"].clear()
 
     text = data.decode('utf-8', errors='replace')
-    # 过滤 ANSI 转义序列
+    # 过滤 ANSI 转义序列 (CSI + OSC)
     text = re.sub(r'\x1b\[[0-9;?]*[a-zA-Z]', '', text)
-    text = re.sub(r'\x1b\][0-9;?]*[^\x07]*\x07', '', text)
+    text = re.sub(r'\x1b\][^\x07]*\x07', '', text)
+    # 过滤残留的 ESC 字符和其他控制字符 (保留 \r \n \t)
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
     return jsonify({"status": "ok", "output": text})
 
 
