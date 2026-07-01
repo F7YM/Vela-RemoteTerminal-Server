@@ -1,0 +1,6 @@
+[
+  {
+    "name": "test",
+    "command": "notify-send \"Hello, World!\" \"这是一个来自Vela的通知消息\""
+  }
+]
