@@ -9,3 +9,6 @@ data/config.json
 data/pending_pair.json
 *.AppImage
 *.zip
+*.rpm
+*.tar.gz
+rpm/
