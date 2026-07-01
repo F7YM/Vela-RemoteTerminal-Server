@@ -1214,18 +1214,9 @@ def ssh_output():
     text = re.sub(r'\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)', '', text)
     # 过滤残留控制字符 (保留 \r \n \t)
     text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
-    # 自动换行：每行超过25字符时硬换行 (适配手表430px@18px)
-    lines = text.split('\n')
-    wrapped = []
-    for line in lines:
-        while len(line) > 25:
-            wrapped.append(line[:25])
-            line = line[25:]
-        wrapped.append(line)
-    text = '\n'.join(wrapped)
-    # 截断
-    if len(text) > 500:
-        text = text[-500:]
+    # 截断总长度，保留尾部最新输出 (换行由客户端根据实际屏幕宽度处理)
+    if len(text) > 2000:
+        text = text[-2000:]
     return jsonify({"status": "ok", "output": text})
 
 
