@@ -1137,7 +1137,7 @@ def ssh_connect():
              '-o', 'UserKnownHostsFile=/dev/null',
              '-o', 'LogLevel=ERROR',
              '-o', 'ConnectTimeout=10',
-             f'{ssh_user}@127.0.0.1'],
+             f'{ssh_user}@127.0.0.1', '/bin/bash'],
             stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
             env=env, start_new_session=True, close_fds=True
         )
