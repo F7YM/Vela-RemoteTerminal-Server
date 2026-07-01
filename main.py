@@ -367,6 +367,22 @@ def add_log(message, level="info"):
     return log_entry
 
 
+def refresh_log_list():
+    """刷新 GUI 日志列表"""
+    global log_list_ref
+    if log_list_ref:
+        log_list_ref.controls.clear()
+        for log in SERVER_LOG[-20:]:
+            color = ft.Colors.RED_400 if log["level"] == "error" else \
+                    ft.Colors.YELLOW_400 if log["level"] == "warning" else \
+                    ft.Colors.GREEN_400 if log["level"] == "success" else \
+                    ft.Colors.GREY_400
+            log_list_ref.controls.append(
+                ft.Text(log["text"], size=12, color=color, font_family="monospace")
+            )
+        log_list_ref.update()
+
+
 def sanitize_path(filename):
     """防止路径遍历攻击"""
     # 移除路径分隔符和.. 
@@ -1097,13 +1113,19 @@ def ssh_connect():
 
     try:
         master_fd, slave_fd = pty.openpty()
+        env = os.environ.copy()
+        env['SSH_ASKPASS'] = ''
+        env.pop('DISPLAY', None)
+        env.pop('WAYLAND_DISPLAY', None)
         process = subprocess.Popen(
             ['ssh', '-tt', '-o', 'StrictHostKeyChecking=no',
              '-o', 'UserKnownHostsFile=/dev/null',
              '-o', 'LogLevel=ERROR',
+             '-o', 'PreferredAuthentications=password,keyboard-interactive',
              f'{ssh_user}@127.0.0.1'],
             stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
-            start_new_session=True,
+            env=env,
+            preexec_fn=os.setsid,
             close_fds=True
         )
         os.close(slave_fd)
@@ -1336,22 +1358,6 @@ def show_pair_dialog(device_id, device_name, port):
     page_ref.update()
 
 
-def refresh_log_list():
-    """刷新日志列表"""
-    if log_list_ref:
-        log_list_ref.controls.clear()
-        for log in SERVER_LOG[-20:]:
-            color = ft.Colors.WHITE
-            if log["level"] == "success":
-                color = ft.Colors.GREEN_400
-            elif log["level"] == "error":
-                color = ft.Colors.RED_400
-            elif log["level"] == "warning":
-                color = ft.Colors.AMBER_400
-            log_list_ref.controls.append(
-                ft.Text(log["text"], size=12, color=color, font_family="monospace")
-            )
-        log_list_ref.update()
 
 
 def refresh_devices():
