@@ -1103,6 +1103,7 @@ def ssh_connect():
              '-o', 'LogLevel=ERROR',
              f'{ssh_user}@127.0.0.1'],
             stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+            start_new_session=True,
             close_fds=True
         )
         os.close(slave_fd)
