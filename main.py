@@ -1790,17 +1790,16 @@ def main(page: ft.Page):
     def on_ssh_toggle(e):
         if e.control.value:
             # 打开 → 弹窗警告
-            confirm_btn = ft.Button("确认 (5s)", disabled=True)
-
-            async def countdown():
-                for i in range(4, -1, -1):
-                    await asyncio.sleep(1)
-                    if i > 0:
-                        confirm_btn.text = f"确认 ({i}s)"
-                    else:
-                        confirm_btn.text = "确认"
-                    confirm_btn.disabled = i > 0
-                    confirm_btn.update()
+            def on_confirm(_):
+                dialog.open = False
+                config["ssh_enabled"] = True
+                save_config(config)
+                ssh_user_field.visible = True
+                add_log("已启用 SSH 连接功能", "info")
+                refresh_log_list()
+                page.update()
+                # 诊断 SSH 连接
+                diagnose_ssh()
 
             dialog = ft.AlertDialog(
                 modal=True,
@@ -1816,26 +1815,13 @@ def main(page: ft.Page):
                         setattr(ssh_switch, 'value', False),
                         page.update()
                     )),
-                    confirm_btn,
+                    ft.Button("确认", on_click=on_confirm),
                 ]
             )
 
-            def on_confirm(_):
-                dialog.open = False
-                config["ssh_enabled"] = True
-                save_config(config)
-                ssh_user_field.visible = True
-                add_log("已启用 SSH 连接功能", "info")
-                refresh_log_list()
-                page.update()
-                # 诊断 SSH 连接
-                diagnose_ssh()
-
-            confirm_btn.on_click = on_confirm
             page.overlay.append(dialog)
             dialog.open = True
             page.update()
-            page.run_task(countdown)
         else:
             # 关闭
             config["ssh_enabled"] = False
