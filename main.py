@@ -1105,6 +1105,11 @@ def ssh_connect():
     if not ssh_user:
         return jsonify({"status": "error", "message": "未配置 SSH 登录用户"}), 400
 
+    data = request.get_json() or {}
+    password = data.get('password', '')
+    if not password:
+        return jsonify({"status": "error", "message": "需要提供 SSH 密码"}), 400
+
     if device_id in ssh_sessions:
         _cleanup_ssh_session(device_id)
 
@@ -1114,19 +1119,15 @@ def ssh_connect():
     try:
         master_fd, slave_fd = pty.openpty()
         env = os.environ.copy()
-        env['SSH_ASKPASS'] = ''
-        env.pop('DISPLAY', None)
-        env.pop('WAYLAND_DISPLAY', None)
+        env['SSHPASS'] = password
         process = subprocess.Popen(
-            ['ssh', '-tt', '-o', 'StrictHostKeyChecking=no',
+            ['sshpass', '-e', 'ssh', '-tt',
+             '-o', 'StrictHostKeyChecking=no',
              '-o', 'UserKnownHostsFile=/dev/null',
              '-o', 'LogLevel=ERROR',
-             '-o', 'PreferredAuthentications=password,keyboard-interactive',
              f'{ssh_user}@127.0.0.1'],
             stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
-            env=env,
-            preexec_fn=os.setsid,
-            close_fds=True
+            env=env, close_fds=True
         )
         os.close(slave_fd)
 
