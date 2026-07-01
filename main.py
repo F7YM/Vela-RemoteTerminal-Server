@@ -398,14 +398,17 @@ def sanitize_path(filename):
 # ============ SSH 进程管理 ============
 
 def _ssh_output_reader(device_id, master_fd):
-    """后台线程: 从 PTY 读取 SSH 输出到缓冲区 (截断 ~100 字)"""
+    """后台线程: 从 PTY 读取 SSH 输出到缓冲区 (截断 ~500 字)"""
     MAX_LEN = 500
-    session = ssh_sessions.get(device_id)
-    if not session:
-        return
     try:
-        while device_id in ssh_sessions:
-            ready, _, _ = select.select([master_fd], [], [], 0.5)
+        while True:
+            session = ssh_sessions.get(device_id)
+            if not session:
+                break
+            try:
+                ready, _, _ = select.select([master_fd], [], [], 0.5)
+            except (OSError, ValueError):
+                break
             if ready:
                 try:
                     data = os.read(master_fd, 4096)
@@ -424,17 +427,24 @@ def _ssh_output_reader(device_id, master_fd):
 
 def _cleanup_ssh_session(device_id):
     """清理单个 SSH 会话"""
-    session = ssh_sessions.pop(device_id, None)
+    session = ssh_sessions.get(device_id)
     if not session:
         return
+    # 先终止进程，再移除 session，防止 reader 线程访问到已被清理的 fd
     try:
         session["process"].terminate()
         try:
             session["process"].wait(timeout=3)
         except subprocess.TimeoutExpired:
             session["process"].kill()
+            try:
+                session["process"].wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                pass
     except Exception:
         pass
+    # 从 dict 移除，阻止 reader 线程继续读取
+    ssh_sessions.pop(device_id, None)
     try:
         os.close(session["master_fd"])
     except OSError:
@@ -1126,9 +1136,10 @@ def ssh_connect():
              '-o', 'StrictHostKeyChecking=no',
              '-o', 'UserKnownHostsFile=/dev/null',
              '-o', 'LogLevel=ERROR',
+             '-o', 'ConnectTimeout=10',
              f'{ssh_user}@127.0.0.1'],
             stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
-            env=env, close_fds=True
+            env=env, start_new_session=True, close_fds=True
         )
         os.close(slave_fd)
 
@@ -1164,18 +1175,20 @@ def ssh_input():
     device_id = request.headers.get('X-Device-ID')
     data = request.get_json()
 
-    if device_id not in ssh_sessions:
+    session = ssh_sessions.get(device_id)
+    if not session:
         return jsonify({"status": "error", "message": "无活跃的 SSH 会话"}), 400
 
     input_text = data.get('input', '')
     if not input_text:
         return jsonify({"status": "error", "message": "输入为空"}), 400
 
+    if len(input_text) > 1024:
+        return jsonify({"status": "error", "message": "输入过长"}), 400
+
     try:
-        session = ssh_sessions[device_id]
         master_fd = session["master_fd"]
         os.write(master_fd, input_text.encode('utf-8'))
-        # 日志中隐藏密码（如果输入看起来像密码提示后的内容）
         return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -1187,18 +1200,19 @@ def ssh_output():
     """获取 SSH 会话的输出缓冲区"""
     device_id = request.headers.get('X-Device-ID')
 
-    if device_id not in ssh_sessions:
+    session = ssh_sessions.get(device_id)
+    if not session:
         return jsonify({"status": "error", "message": "无活跃的 SSH 会话"}), 400
 
-    session = ssh_sessions[device_id]
     with session["lock"]:
         data = bytes(session["buffer"])
         session["buffer"].clear()
 
     text = data.decode('utf-8', errors='replace')
-    # 过滤 ANSI 转义序列 (CSI + OSC)
-    text = re.sub(r'\x1b\[[0-9;?]*[a-zA-Z]', '', text)
-    text = re.sub(r'\x1b\][^\x07]*\x07', '', text)
+    # 过滤 ANSI 转义序列: CSI (\x1b[ + 参数 + 终结符) 和 OSC (\x1b]...\x07 或 \x1b]...\x1b\\)
+    # 中间字节 (0x20-0x2F) 可在参数字节和终结字节之间出现
+    text = re.sub(r'\x1b\[[0-9;?]*[\x20-\x2f]*[\x40-\x7e]', '', text)
+    text = re.sub(r'\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)', '', text)
     # 过滤残留控制字符 (保留 \r \n \t)
     text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
     # 自动换行：每行超过25字符时硬换行 (适配手表430px@18px)
@@ -1222,10 +1236,10 @@ def ssh_heartbeat():
     """SSH 会话心跳检测"""
     device_id = request.headers.get('X-Device-ID')
 
-    if device_id not in ssh_sessions:
+    session = ssh_sessions.get(device_id)
+    if not session:
         return jsonify({"status": "ok", "alive": False})
 
-    session = ssh_sessions[device_id]
     alive = session["process"].poll() is None
     return jsonify({"status": "ok", "alive": alive})
 
