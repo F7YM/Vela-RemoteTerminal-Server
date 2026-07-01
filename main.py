@@ -1793,11 +1793,14 @@ def main(page: ft.Page):
             confirm_btn = ft.Button("确认 (5s)", disabled=True)
 
             async def countdown():
-                for i in range(5, 0, -1):
+                for i in range(4, -1, -1):
                     await asyncio.sleep(1)
-                    confirm_btn.text = f"确认 ({i}s)"
-                    confirm_btn.disabled = i > 1
-                    page.update()
+                    if i > 0:
+                        confirm_btn.text = f"确认 ({i}s)"
+                    else:
+                        confirm_btn.text = "确认"
+                    confirm_btn.disabled = i > 0
+                    confirm_btn.update()
 
             dialog = ft.AlertDialog(
                 modal=True,
