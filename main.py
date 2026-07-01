@@ -382,7 +382,7 @@ def sanitize_path(filename):
 
 def _ssh_output_reader(device_id, master_fd):
     """后台线程: 从 PTY 读取 SSH 输出到缓冲区 (截断 ~100 字)"""
-    MAX_LEN = 100
+    MAX_LEN = 500
     session = ssh_sessions.get(device_id)
     if not session:
         return
