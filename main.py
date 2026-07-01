@@ -396,6 +396,7 @@ def _ssh_output_reader(device_id, master_fd):
                     break
                 if not data:
                     break
+                add_log(f"SSH 输出({len(data)}B): {repr(data[:100])}", "debug")
                 with session["lock"]:
                     session["buffer"].extend(data)
                     if len(session["buffer"]) > MAX_LEN:
@@ -1149,6 +1150,7 @@ def ssh_input():
         session = ssh_sessions[device_id]
         master_fd = session["master_fd"]
         os.write(master_fd, input_text.encode('utf-8'))
+        # 日志中隐藏密码（如果输入看起来像密码提示后的内容）
         return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
