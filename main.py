@@ -1199,8 +1199,20 @@ def ssh_output():
     # 过滤 ANSI 转义序列 (CSI + OSC)
     text = re.sub(r'\x1b\[[0-9;?]*[a-zA-Z]', '', text)
     text = re.sub(r'\x1b\][^\x07]*\x07', '', text)
-    # 过滤残留的 ESC 字符和其他控制字符 (保留 \r \n \t)
+    # 过滤残留控制字符 (保留 \r \n \t)
     text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
+    # 自动换行：每行超过25字符时硬换行 (适配手表430px@18px)
+    lines = text.split('\n')
+    wrapped = []
+    for line in lines:
+        while len(line) > 25:
+            wrapped.append(line[:25])
+            line = line[25:]
+        wrapped.append(line)
+    text = '\n'.join(wrapped)
+    # 截断
+    if len(text) > 500:
+        text = text[-500:]
     return jsonify({"status": "ok", "output": text})
 
 
