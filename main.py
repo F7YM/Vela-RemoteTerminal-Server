@@ -16,6 +16,14 @@ import time
 import uuid
 import subprocess
 import urllib.request
+import threading
+import select
+try:
+    import pty
+    import fcntl
+    HAS_PTY = True
+except ImportError:
+    HAS_PTY = False
 from datetime import datetime
 from flask import Flask, request, jsonify, send_file, abort
 from flask_cors import CORS
@@ -233,6 +241,9 @@ server_running = False
 flask_server = None
 server_thread = None
 
+# SSH 会话管理
+ssh_sessions = {}  # {device_id: {process, master_fd, buffer: bytearray, lock, thread}}
+
 # ============ 工具函数 ============
 
 def get_data_dir():
@@ -302,7 +313,7 @@ def save_commands(commands):
 
 
 def load_config():
-    return load_json(CONFIG_FILE, {"terminal_enabled": False})
+    return load_json(CONFIG_FILE, {"terminal_enabled": False, "ssh_enabled": False, "ssh_user": ""})
 
 
 def save_config(config):
@@ -365,6 +376,51 @@ def sanitize_path(filename):
     if not re.match(r'^[a-zA-Z0-9_\-\.]+$', filename):
         return None
     return filename
+
+
+# ============ SSH 进程管理 ============
+
+def _ssh_output_reader(device_id, master_fd):
+    """后台线程: 从 PTY 读取 SSH 输出到缓冲区 (截断 ~100 字)"""
+    MAX_LEN = 100
+    session = ssh_sessions.get(device_id)
+    if not session:
+        return
+    try:
+        while device_id in ssh_sessions:
+            ready, _, _ = select.select([master_fd], [], [], 0.5)
+            if ready:
+                try:
+                    data = os.read(master_fd, 4096)
+                except OSError:
+                    break
+                if not data:
+                    break
+                with session["lock"]:
+                    session["buffer"].extend(data)
+                    if len(session["buffer"]) > MAX_LEN:
+                        session["buffer"] = session["buffer"][-MAX_LEN:]
+    except (OSError, Exception):
+        pass
+
+
+def _cleanup_ssh_session(device_id):
+    """清理单个 SSH 会话"""
+    session = ssh_sessions.pop(device_id, None)
+    if not session:
+        return
+    try:
+        session["process"].terminate()
+        try:
+            session["process"].wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            session["process"].kill()
+    except Exception:
+        pass
+    try:
+        os.close(session["master_fd"])
+    except OSError:
+        pass
 
 
 # ============ Flask 路由 ============
@@ -1016,6 +1072,133 @@ def get_server_pid(port):
         return None
 
 
+# ============ SSH API 端点 ============
+
+@flask_app.route('/api/ssh/connect', methods=['POST'])
+@require_trusted
+def ssh_connect():
+    """启动 SSH 会话"""
+    device_id = request.headers.get('X-Device-ID')
+    config = load_config()
+
+    if not config.get('ssh_enabled', False):
+        return jsonify({"status": "error", "message": "SSH 功能未启用"}), 400
+
+    ssh_user = config.get('ssh_user', '').strip()
+    if not ssh_user:
+        return jsonify({"status": "error", "message": "未配置 SSH 登录用户"}), 400
+
+    if device_id in ssh_sessions:
+        _cleanup_ssh_session(device_id)
+
+    if not HAS_PTY:
+        return jsonify({"status": "error", "message": "当前系统不支持 PTY (仅 Linux/macOS 可用)"}), 500
+
+    try:
+        master_fd, slave_fd = pty.openpty()
+        process = subprocess.Popen(
+            ['ssh', '-tt', '-o', 'StrictHostKeyChecking=no',
+             '-o', 'UserKnownHostsFile=/dev/null',
+             f'{ssh_user}@127.0.0.1'],
+            stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+            close_fds=True
+        )
+        os.close(slave_fd)
+
+        flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
+        fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+        ssh_sessions[device_id] = {
+            "process": process,
+            "master_fd": master_fd,
+            "buffer": bytearray(),
+            "lock": threading.Lock(),
+            "thread": None
+        }
+
+        reader_thread = threading.Thread(
+            target=_ssh_output_reader, args=(device_id, master_fd), daemon=True
+        )
+        reader_thread.start()
+        ssh_sessions[device_id]["thread"] = reader_thread
+
+        add_log(f"SSH 会话已启动: {ssh_user}@127.0.0.1 (设备: {device_id[:8]}...)", "success")
+        return jsonify({"status": "ok", "message": "SSH 已连接"})
+
+    except Exception as e:
+        add_log(f"SSH 连接失败: {str(e)}", "error")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@flask_app.route('/api/ssh/input', methods=['POST'])
+@require_trusted
+def ssh_input():
+    """向 SSH 会话发送输入"""
+    device_id = request.headers.get('X-Device-ID')
+    data = request.get_json()
+
+    if device_id not in ssh_sessions:
+        return jsonify({"status": "error", "message": "无活跃的 SSH 会话"}), 400
+
+    input_text = data.get('input', '')
+    if not input_text:
+        return jsonify({"status": "error", "message": "输入为空"}), 400
+
+    try:
+        session = ssh_sessions[device_id]
+        master_fd = session["master_fd"]
+        os.write(master_fd, input_text.encode('utf-8'))
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@flask_app.route('/api/ssh/output', methods=['GET'])
+@require_trusted
+def ssh_output():
+    """获取 SSH 会话的输出缓冲区"""
+    device_id = request.headers.get('X-Device-ID')
+
+    if device_id not in ssh_sessions:
+        return jsonify({"status": "error", "message": "无活跃的 SSH 会话"}), 400
+
+    session = ssh_sessions[device_id]
+    with session["lock"]:
+        data = bytes(session["buffer"])
+        session["buffer"].clear()
+
+    text = data.decode('utf-8', errors='replace')
+    return jsonify({"status": "ok", "output": text})
+
+
+@flask_app.route('/api/ssh/heartbeat', methods=['GET'])
+@require_trusted
+def ssh_heartbeat():
+    """SSH 会话心跳检测"""
+    device_id = request.headers.get('X-Device-ID')
+
+    if device_id not in ssh_sessions:
+        return jsonify({"status": "ok", "alive": False})
+
+    session = ssh_sessions[device_id]
+    alive = session["process"].poll() is None
+    return jsonify({"status": "ok", "alive": alive})
+
+
+@flask_app.route('/api/ssh/disconnect', methods=['POST'])
+@require_trusted
+def ssh_disconnect():
+    """断开 SSH 会话"""
+    device_id = request.headers.get('X-Device-ID')
+
+    if device_id not in ssh_sessions:
+        return jsonify({"status": "error", "message": "无活跃的 SSH 会话"}), 400
+
+    _cleanup_ssh_session(device_id)
+    add_log(f"SSH 会话已断开 (设备: {device_id[:8]}...)", "info")
+    return jsonify({"status": "ok", "message": "SSH 已断开"})
+
+
 # ============ 系统信息函数 ============
 
 def get_system_info():
@@ -1377,6 +1560,9 @@ def main(page: ft.Page):
             save_config(config)
             cleanup_static_dir()
         else:
+            # 清理所有 SSH 会话
+            for did in list(ssh_sessions.keys()):
+                _cleanup_ssh_session(did)
             if flask_server:
                 flask_server.shutdown()
                 flask_server = None
@@ -1545,6 +1731,124 @@ def main(page: ft.Page):
         scale=0.8
     )
 
+    # SSH 功能诊断
+    def diagnose_ssh():
+        """测试 127.0.0.1:22 是否可达，不可达则诊断并给出指导"""
+        try:
+            sock = socket.create_connection(('127.0.0.1', 22), timeout=2)
+            sock.close()
+            add_log("SSH 服务 (127.0.0.1:22) 可用", "success")
+            return True
+        except ConnectionRefusedError:
+            add_log("SSH 连接被拒绝 (127.0.0.1:22)", "warning")
+            system = platform.system()
+            if system == "Linux":
+                try:
+                    result = subprocess.run(['which', 'sshd'], capture_output=True, text=True, timeout=5)
+                    sshd_installed = result.returncode == 0 and result.stdout.strip()
+                except Exception:
+                    sshd_installed = False
+
+                if not sshd_installed:
+                    _msg = "未检测到 OpenSSH 服务端。\n\n请运行以下命令安装:\nsudo dnf install openssh-server\nsudo systemctl enable --now sshd"
+                else:
+                    _msg = "SSH 服务已安装但未运行。\n\n请运行以下命令启动:\nsudo systemctl start sshd"
+            elif system == "Windows":
+                _msg = "请在 设置 > 应用 > 可选功能 中添加 OpenSSH 服务器，或通过 PowerShell 安装:\nAdd-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0\nStart-Service sshd"
+            else:
+                _msg = f"请确保 SSH 服务已在 127.0.0.1:22 上运行。\n当前系统: {system}"
+            show_ssh_diag_dialog(_msg)
+            return False
+        except Exception as e:
+            add_log(f"SSH 连接测试失败: {str(e)}", "warning")
+            show_ssh_diag_dialog(f"无法连接到 127.0.0.1:22:\n{str(e)}\n\n请确保 SSH 服务已启动。")
+            return False
+
+    def show_ssh_diag_dialog(message):
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("SSH 连接诊断"),
+            content=ft.Text(message, size=13),
+            actions=[
+                ft.TextButton("确定", on_click=lambda _: (setattr(dialog, 'open', False), page.update()))
+            ]
+        )
+        page.overlay.append(dialog)
+        dialog.open = True
+        page.update()
+
+    # SSH 用户名字段
+    ssh_user_field = ft.TextField(
+        label="SSH 登录用户",
+        value=config.get("ssh_user", ""),
+        width=200,
+        visible=config.get("ssh_enabled", False),
+        on_change=lambda e: (config.update({"ssh_user": e.control.value.strip()}), save_config(config))
+    )
+
+    # SSH 开关
+    def on_ssh_toggle(e):
+        if e.control.value:
+            # 打开 → 弹窗警告
+            confirm_btn = ft.Button("确认 (5s)", disabled=True)
+
+            async def countdown():
+                for i in range(5, 0, -1):
+                    await asyncio.sleep(1)
+                    confirm_btn.text = f"确认 ({i}s)"
+                    confirm_btn.disabled = i > 1
+                    page.update()
+
+            dialog = ft.AlertDialog(
+                modal=True,
+                title=ft.Text("安全警告"),
+                content=ft.Text(
+                    "远程终端使用 http 协议与 Vela 通信，这可能会带来安全风险，"
+                    "请勿在公共网络下使用该功能。一切因使用 http SSH 功能造成的后果由用户自行承担。",
+                    size=13
+                ),
+                actions=[
+                    ft.TextButton("取消", on_click=lambda _: (
+                        setattr(dialog, 'open', False),
+                        setattr(ssh_switch, 'value', False),
+                        page.update()
+                    )),
+                    confirm_btn,
+                ]
+            )
+
+            def on_confirm(_):
+                dialog.open = False
+                config["ssh_enabled"] = True
+                save_config(config)
+                ssh_user_field.visible = True
+                add_log("已启用 SSH 连接功能", "info")
+                refresh_log_list()
+                page.update()
+                # 诊断 SSH 连接
+                diagnose_ssh()
+
+            confirm_btn.on_click = on_confirm
+            page.overlay.append(dialog)
+            dialog.open = True
+            page.update()
+            page.run_task(countdown)
+        else:
+            # 关闭
+            config["ssh_enabled"] = False
+            save_config(config)
+            ssh_user_field.visible = False
+            add_log("已禁用 SSH 连接功能", "info")
+            refresh_log_list()
+            page.update()
+
+    ssh_switch = ft.Switch(
+        value=config.get("ssh_enabled", False),
+        on_change=on_ssh_toggle,
+        active_color=ft.Colors.BLUE_400,
+        scale=0.8
+    )
+
     # 设置标签页
     settings_tab_content = ft.Container(
         content=ft.Column([
@@ -1555,6 +1859,11 @@ def main(page: ft.Page):
             ft.Text("服务器后台运行", size=14),
             ft.Text("关闭窗口后服务继续在后台运行", size=11, color=ft.Colors.GREY_400),
             ft.Row([ft.Container(expand=True), background_switch]),
+            ft.Divider(height=1, color=ft.Colors.GREY_800),
+            ft.Text("允许通过 SSH 连接本机", size=14),
+            ft.Text("开启后 Vela 设备可通过 SSH 控制本机终端", size=11, color=ft.Colors.GREY_400),
+            ft.Row([ft.Container(expand=True), ssh_switch]),
+            ssh_user_field,
         ], spacing=8),
         padding=10,
         expand=True

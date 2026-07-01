@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+dist/
+build/
+*.spec
+data/static/
+data/config.json
+data/pending_pair.json
+*.AppImage
+*.zip
