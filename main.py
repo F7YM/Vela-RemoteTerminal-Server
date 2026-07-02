@@ -1142,10 +1142,10 @@ def ssh_connect():
         return jsonify({"status": "error", "message": "未配置 SSH 登录用户"}), 400
 
     data = request.get_json() or {}
-    encrypted = data.get('password', '')
+    password = data.get('password', '')
     cols = data.get('cols', 80)
     rows = data.get('rows', 24)
-    if not encrypted:
+    if not password:
         return jsonify({"status": "error", "message": "需要密码"}), 400
 
     # 速率限制
@@ -1153,9 +1153,11 @@ def ssh_connect():
     if not allowed:
         return jsonify({"status": "error", "message": "太频繁"}), 429
 
-    # XOR 解密
-    key = config.get("encryption_key", "")
-    password = _xor_crypt(encrypted, key) if key else encrypted
+    # XOR 解密 (仅当客户端标记已加密时)
+    if data.get('encrypted'):
+        key = config.get("encryption_key", "")
+        if key:
+            password = _xor_crypt(password, key)
 
     if device_id in ssh_sessions:
         _cleanup_ssh_session(device_id)
