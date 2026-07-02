@@ -413,8 +413,8 @@ def _set_pty_size(device_id, cols, rows):
 
 
 def _ssh_output_reader(device_id, master_fd):
-    """后台线程: 从 PTY 读取 SSH 输出到缓冲区 (截断 ~500 字)"""
-    MAX_LEN = 500
+    """后台线程: 从 PTY 读取 SSH 输出到缓冲区 (截断 ~50KB)"""
+    MAX_LEN = 50000
     try:
         while True:
             session = ssh_sessions.get(device_id)
@@ -1251,9 +1251,11 @@ def ssh_output():
     text = re.sub(r'\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)', '', text)
     # 过滤残留控制字符 (保留 \r \n \t)
     text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
-    # 截断总长度，保留尾部最新输出 (换行由客户端根据实际屏幕宽度处理)
-    if len(text) > 2000:
-        text = text[-2000:]
+    # 过滤 PAM/systemd audit 噪声行 (以 audit 字段开头的 key=value;... 行)
+    text = re.sub(r'^(?:user|hostname|bootid|pid|type|cwd|_COMM|_EXE|_UID|_GID|_PID|_TRANSPORT|SYSLOG_FACILITY)=[^;\n]*(?:;[a-z_]+=[^;\n]*)*\n', '', text, flags=re.MULTILINE)
+    # 截断总长度，保留尾部最新输出
+    if len(text) > 10000:
+        text = text[-10000:]
     return jsonify({"status": "ok", "output": text})
 
 
