@@ -22,6 +22,8 @@ import select
 try:
     import pty
     import fcntl
+    import struct
+    import termios
     HAS_PTY = True
 except ImportError:
     HAS_PTY = False
@@ -396,6 +398,19 @@ def sanitize_path(filename):
 
 
 # ============ SSH 进程管理 ============
+
+def _set_pty_size(device_id, cols, rows):
+    """通过 TIOCSWINSZ 设置 PTY 窗口尺寸，并发送 SIGWINCH 通知进程"""
+    session = ssh_sessions.get(device_id)
+    if not session:
+        return
+    try:
+        winsize = struct.pack('HHHH', rows, cols, 0, 0)
+        fcntl.ioctl(session["master_fd"], termios.TIOCSWINSZ, winsize)
+        os.kill(session["process"].pid, signal.SIGWINCH)
+    except Exception:
+        pass
+
 
 def _ssh_output_reader(device_id, master_fd):
     """后台线程: 从 PTY 读取 SSH 输出到缓冲区 (截断 ~500 字)"""
@@ -1118,6 +1133,8 @@ def ssh_connect():
 
     data = request.get_json() or {}
     password = data.get('password', '')
+    cols = data.get('cols', 80)
+    rows = data.get('rows', 24)
     if not password:
         return jsonify({"status": "error", "message": "需要提供 SSH 密码"}), 400
 
@@ -1160,6 +1177,9 @@ def ssh_connect():
         reader_thread.start()
         ssh_sessions[device_id]["thread"] = reader_thread
 
+        # 设置 PTY 窗口尺寸为客户端实际屏幕大小
+        _set_pty_size(device_id, cols, rows)
+
         add_log(f"SSH 会话已启动: {ssh_user}@127.0.0.1 (设备: {device_id[:8]}...)", "success")
         return jsonify({"status": "ok", "message": "SSH 已连接"})
 
@@ -1192,6 +1212,23 @@ def ssh_input():
         return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@flask_app.route('/api/ssh/resize', methods=['POST'])
+@require_trusted
+def ssh_resize():
+    """更新 SSH 会话的终端窗口尺寸"""
+    device_id = request.headers.get('X-Device-ID')
+    data = request.get_json() or {}
+    cols = data.get('cols', 80)
+    rows = data.get('rows', 24)
+
+    session = ssh_sessions.get(device_id)
+    if not session:
+        return jsonify({"status": "error", "message": "无活跃的 SSH 会话"}), 400
+
+    _set_pty_size(device_id, cols, rows)
+    return jsonify({"status": "ok"})
 
 
 @flask_app.route('/api/ssh/output', methods=['GET'])
