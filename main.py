@@ -1127,6 +1127,14 @@ def get_server_pid(port):
 
 # ============ SSH API 端点 ============
 
+@flask_app.route('/api/ssh/key', methods=['GET'])
+@require_trusted
+def ssh_key():
+    """返回加密密钥（已信任设备可用）"""
+    config = load_config()
+    return jsonify({"status": "ok", "encryption_key": config.get("encryption_key", "")})
+
+
 @flask_app.route('/api/ssh/connect', methods=['POST'])
 @require_trusted
 def ssh_connect():
