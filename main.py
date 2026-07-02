@@ -14,6 +14,7 @@ import platform
 import socket
 import time
 import uuid
+import binascii
 import subprocess
 import urllib.request
 import re
@@ -308,7 +309,37 @@ def save_commands(commands):
 
 
 def load_config():
-    return load_json(CONFIG_FILE, {"terminal_enabled": False, "ssh_enabled": False, "ssh_user": ""})
+    config = load_json(CONFIG_FILE, {"terminal_enabled": False, "ssh_enabled": False, "ssh_user": ""})
+    if "encryption_key" not in config:
+        config["encryption_key"] = uuid.uuid4().hex + uuid.uuid4().hex
+        save_json(CONFIG_FILE, config)
+    return config
+
+
+# 速率限制: {device_id: [timestamp, ...]}
+_rate_limit = {}
+
+
+def _check_rate(device_id, max_req=10, window=60):
+    """检查速率限制, 返回 (allowed: bool, remaining: int)"""
+    now = time.time()
+    if device_id not in _rate_limit:
+        _rate_limit[device_id] = []
+    times = [t for t in _rate_limit[device_id] if now - t < window]
+    _rate_limit[device_id] = times
+    if len(times) >= max_req:
+        return False, 0
+    _rate_limit[device_id].append(now)
+    return True, max_req - len(times) - 1
+
+
+def _xor_crypt(text, key):
+    """XOR encrypt/decrypt, 输入输出都是 hex 字符串"""
+    raw = binascii.unhexlify(text)
+    result = bytearray(len(raw))
+    for i in range(len(raw)):
+        result[i] = raw[i] ^ ord(key[i % len(key)])
+    return result.decode('utf-8', errors='replace')
 
 
 def save_config(config):
@@ -420,7 +451,6 @@ def _ssh_output_reader(device_id):
                 break
             if not data:
                 break
-            add_log(f"SSH 输出({len(data)}B): {repr(data[:100])}", "debug")
             with session["lock"]:
                 session["buffer"].extend(data)
                 if len(session["buffer"]) > MAX_LEN:
@@ -483,7 +513,8 @@ def pair_device():
         for d in devices:
             if d.get('device_id') == device_id:
                 add_log(f"设备 {device_id[:8]}... 已信任", "success")
-                return jsonify({"status": "trusted", "message": "Device already trusted"})
+                config = load_config()
+                return jsonify({"status": "trusted", "message": "Device already trusted", "encryption_key": config.get("encryption_key", "")})
 
         add_log(f"配对请求: {device_id[:8]}...", "warning")
         save_pending_pair(device_id, device_name)
@@ -577,7 +608,8 @@ def check_device(device_id):
     devices = load_trusted_devices()
     for d in devices:
         if d.get('device_id') == device_id:
-            return jsonify({"status": "trusted"})
+            config = load_config()
+            return jsonify({"status": "trusted", "encryption_key": config.get("encryption_key", "")})
     return jsonify({"status": "pending"})
 
 
@@ -1110,11 +1142,20 @@ def ssh_connect():
         return jsonify({"status": "error", "message": "未配置 SSH 登录用户"}), 400
 
     data = request.get_json() or {}
-    password = data.get('password', '')
+    encrypted = data.get('password', '')
     cols = data.get('cols', 80)
     rows = data.get('rows', 24)
-    if not password:
-        return jsonify({"status": "error", "message": "需要提供 SSH 密码"}), 400
+    if not encrypted:
+        return jsonify({"status": "error", "message": "需要密码"}), 400
+
+    # 速率限制
+    allowed, remaining = _check_rate(device_id, 10, 60)
+    if not allowed:
+        return jsonify({"status": "error", "message": "太频繁"}), 429
+
+    # XOR 解密
+    key = config.get("encryption_key", "")
+    password = _xor_crypt(encrypted, key) if key else encrypted
 
     if device_id in ssh_sessions:
         _cleanup_ssh_session(device_id)
@@ -1126,7 +1167,11 @@ def ssh_connect():
             '127.0.0.1', port=22, username=ssh_user, password=password,
             timeout=10, allow_agent=False, look_for_keys=False
         )
-        channel = client.invoke_shell(term='xterm', width=cols, height=rows)
+        password = None  # 清除密码引用
+
+        channel = client.get_transport().open_session()
+        channel.get_pty(term='xterm', width=cols, height=rows)
+        channel.exec_command('/bin/bash -i')
 
         ssh_sessions[device_id] = {
             "client": client,
@@ -1142,14 +1187,14 @@ def ssh_connect():
         reader_thread.start()
         ssh_sessions[device_id]["thread"] = reader_thread
 
-        add_log(f"SSH 会话已启动: {ssh_user}@127.0.0.1 (设备: {device_id[:8]}...)", "success")
+        add_log(f"SSH 已连接: {ssh_user}@127.0.0.1 (设备: {device_id[:8]}...)", "success")
         return jsonify({"status": "ok", "message": "SSH 已连接"})
 
     except paramiko.AuthenticationException:
-        return jsonify({"status": "error", "message": "SSH 密码错误"}), 401
+        return jsonify({"status": "error", "message": "认证失败"}), 401
     except Exception as e:
-        add_log(f"SSH 连接失败: {str(e)}", "error")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        add_log(f"SSH 连接失败: {str(e)[:60]}", "error")
+        return jsonify({"status": "error", "message": "连接失败"}), 500
 
 
 @flask_app.route('/api/ssh/input', methods=['POST'])
@@ -1212,8 +1257,15 @@ def ssh_output():
     # 中间字节 (0x20-0x2F) 可在参数字节和终结字节之间出现
     text = re.sub(r'\x1b\[[0-9;?]*[\x20-\x2f]*[\x40-\x7e]', '', text)
     text = re.sub(r'\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)', '', text)
-    # 过滤残留控制字符 (保留 \r \n \t)
-    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
+    # 处理退格: 每遇到 \x08 就删除它前面的字符 (模拟终端擦除)
+    while '\x08' in text:
+        i = text.index('\x08')
+        if i > 0:
+            text = text[:i-1] + text[i+1:]
+        else:
+            text = text[i+1:]
+    # 过滤残留控制字符 (保留 \n \t)
+    text = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f]', '', text)
     # 过滤 PAM/systemd audit 噪声行 (以 audit 字段开头的 key=value;... 行)
     text = re.sub(r'^(?:user|hostname|bootid|pid|type|cwd|_COMM|_EXE|_UID|_GID|_PID|_TRANSPORT|SYSLOG_FACILITY)=[^;\n]*(?:;[a-z_]+=[^;\n]*)*\n', '', text, flags=re.MULTILINE)
     # 截断总长度，保留尾部最新输出
