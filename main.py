@@ -18,15 +18,7 @@ import subprocess
 import urllib.request
 import re
 import threading
-import select
-try:
-    import pty
-    import fcntl
-    import struct
-    import termios
-    HAS_PTY = True
-except ImportError:
-    HAS_PTY = False
+import paramiko
 from datetime import datetime
 from flask import Flask, request, jsonify, send_file, abort
 from flask_cors import CORS
@@ -245,7 +237,7 @@ flask_server = None
 server_thread = None
 
 # SSH 会话管理
-ssh_sessions = {}  # {device_id: {process, master_fd, buffer: bytearray, lock, thread}}
+ssh_sessions = {}  # {device_id: {client: SSHClient, channel: Channel, buffer: bytearray, lock, thread}}
 
 # ============ 工具函数 ============
 
@@ -397,72 +389,58 @@ def sanitize_path(filename):
     return filename
 
 
-# ============ SSH 进程管理 ============
+# ============ SSH 会话管理 (paramiko) ============
 
 def _set_pty_size(device_id, cols, rows):
-    """通过 TIOCSWINSZ 设置 PTY 窗口尺寸，并发送 SIGWINCH 通知进程"""
+    """通过 SSH 协议调整终端窗口尺寸"""
     session = ssh_sessions.get(device_id)
     if not session:
         return
     try:
-        winsize = struct.pack('HHHH', rows, cols, 0, 0)
-        fcntl.ioctl(session["master_fd"], termios.TIOCSWINSZ, winsize)
-        os.kill(session["process"].pid, signal.SIGWINCH)
+        session["channel"].resize_pty(width=cols, height=rows)
     except Exception:
         pass
 
 
-def _ssh_output_reader(device_id, master_fd):
-    """后台线程: 从 PTY 读取 SSH 输出到缓冲区 (截断 ~50KB)"""
+def _ssh_output_reader(device_id):
+    """后台线程: 从 paramiko channel 读取 SSH 输出到缓冲区 (截断 ~50KB)"""
     MAX_LEN = 50000
     try:
         while True:
             session = ssh_sessions.get(device_id)
             if not session:
                 break
+            channel = session["channel"]
             try:
-                ready, _, _ = select.select([master_fd], [], [], 0.5)
-            except (OSError, ValueError):
+                if not channel.recv_ready():
+                    time.sleep(0.1)
+                    continue
+                data = channel.recv(4096)
+            except Exception:
                 break
-            if ready:
-                try:
-                    data = os.read(master_fd, 4096)
-                except OSError:
-                    break
-                if not data:
-                    break
-                add_log(f"SSH 输出({len(data)}B): {repr(data[:100])}", "debug")
-                with session["lock"]:
-                    session["buffer"].extend(data)
-                    if len(session["buffer"]) > MAX_LEN:
-                        session["buffer"] = session["buffer"][-MAX_LEN:]
-    except (OSError, Exception):
+            if not data:
+                break
+            add_log(f"SSH 输出({len(data)}B): {repr(data[:100])}", "debug")
+            with session["lock"]:
+                session["buffer"].extend(data)
+                if len(session["buffer"]) > MAX_LEN:
+                    session["buffer"] = session["buffer"][-MAX_LEN:]
+    except Exception:
         pass
 
 
 def _cleanup_ssh_session(device_id):
     """清理单个 SSH 会话"""
-    session = ssh_sessions.get(device_id)
+    session = ssh_sessions.pop(device_id, None)
     if not session:
         return
-    # 先终止进程，再移除 session，防止 reader 线程访问到已被清理的 fd
     try:
-        session["process"].terminate()
-        try:
-            session["process"].wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            session["process"].kill()
-            try:
-                session["process"].wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                pass
+        session["channel"].close()
     except Exception:
         pass
-    # 从 dict 移除，阻止 reader 线程继续读取
-    ssh_sessions.pop(device_id, None)
     try:
-        os.close(session["master_fd"])
-    except OSError:
+        session["client"].close()
+    except Exception:
         pass
 
 
@@ -1141,48 +1119,34 @@ def ssh_connect():
     if device_id in ssh_sessions:
         _cleanup_ssh_session(device_id)
 
-    if not HAS_PTY:
-        return jsonify({"status": "error", "message": "当前系统不支持 PTY (仅 Linux/macOS 可用)"}), 500
-
     try:
-        master_fd, slave_fd = pty.openpty()
-        env = os.environ.copy()
-        env['SSHPASS'] = password
-        process = subprocess.Popen(
-            ['sshpass', '-e', 'ssh', '-tt',
-             '-o', 'StrictHostKeyChecking=no',
-             '-o', 'UserKnownHostsFile=/dev/null',
-             '-o', 'LogLevel=ERROR',
-             '-o', 'ConnectTimeout=10',
-             f'{ssh_user}@127.0.0.1', '/bin/bash'],
-            stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
-            env=env, start_new_session=True, close_fds=True
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(
+            '127.0.0.1', port=22, username=ssh_user, password=password,
+            timeout=10, allow_agent=False, look_for_keys=False
         )
-        os.close(slave_fd)
-
-        flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
-        fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        channel = client.invoke_shell(term='xterm', width=cols, height=rows)
 
         ssh_sessions[device_id] = {
-            "process": process,
-            "master_fd": master_fd,
+            "client": client,
+            "channel": channel,
             "buffer": bytearray(),
             "lock": threading.Lock(),
             "thread": None
         }
 
         reader_thread = threading.Thread(
-            target=_ssh_output_reader, args=(device_id, master_fd), daemon=True
+            target=_ssh_output_reader, args=(device_id,), daemon=True
         )
         reader_thread.start()
         ssh_sessions[device_id]["thread"] = reader_thread
 
-        # 设置 PTY 窗口尺寸为客户端实际屏幕大小
-        _set_pty_size(device_id, cols, rows)
-
         add_log(f"SSH 会话已启动: {ssh_user}@127.0.0.1 (设备: {device_id[:8]}...)", "success")
         return jsonify({"status": "ok", "message": "SSH 已连接"})
 
+    except paramiko.AuthenticationException:
+        return jsonify({"status": "error", "message": "SSH 密码错误"}), 401
     except Exception as e:
         add_log(f"SSH 连接失败: {str(e)}", "error")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -1207,8 +1171,7 @@ def ssh_input():
         return jsonify({"status": "error", "message": "输入过长"}), 400
 
     try:
-        master_fd = session["master_fd"]
-        os.write(master_fd, input_text.encode('utf-8'))
+        session["channel"].send(input_text)
         return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -1269,7 +1232,8 @@ def ssh_heartbeat():
     if not session:
         return jsonify({"status": "ok", "alive": False})
 
-    alive = session["process"].poll() is None
+    transport = session["client"].get_transport()
+    alive = transport is not None and transport.is_active()
     return jsonify({"status": "ok", "alive": alive})
 
 

@@ -9,7 +9,7 @@ a = Analysis(
         ('/home/float/.local/lib/python3.14/site-packages/flet', 'flet'),
         ('/home/float/桌面/Projects/RemoteTerminal/server/RemoteTerminal.png', '.'),
     ],
-    hiddenimports=['PIL'],
+    hiddenimports=['PIL', 'paramiko', 'cryptography'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
