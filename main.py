@@ -1877,12 +1877,16 @@ def main(page: ft.Page):
 
     # SSH 用户名字段
     ssh_user_field = ft.TextField(
-        label="SSH 登录用户",
         value=config.get("ssh_user", ""),
-        width=200,
-        visible=config.get("ssh_enabled", False),
+        width=160,
+        text_align=ft.TextAlign.RIGHT,
         on_change=lambda e: (config.update({"ssh_user": e.control.value.strip()}), save_config(config))
     )
+
+    ssh_user_row = ft.Row([
+        ft.Text("SSH 登录用户", size=14),
+        ssh_user_field,
+    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, visible=config.get("ssh_enabled", False))
 
     # SSH 开关
     def on_ssh_toggle(e):
@@ -1892,7 +1896,7 @@ def main(page: ft.Page):
                 dialog.open = False
                 config["ssh_enabled"] = True
                 save_config(config)
-                ssh_user_field.visible = True
+                ssh_user_row.visible = True
                 add_log("已启用 SSH 连接功能", "info")
                 refresh_log_list()
                 page.update()
@@ -1924,7 +1928,7 @@ def main(page: ft.Page):
             # 关闭
             config["ssh_enabled"] = False
             save_config(config)
-            ssh_user_field.visible = False
+            ssh_user_row.visible = False
             add_log("已禁用 SSH 连接功能", "info")
             refresh_log_list()
             page.update()
@@ -1950,8 +1954,8 @@ def main(page: ft.Page):
             ft.Text("允许通过 SSH 连接本机", size=14),
             ft.Text("开启后 Vela 设备可通过 SSH 控制本机终端", size=11, color=ft.Colors.GREY_400),
             ft.Row([ft.Container(expand=True), ssh_switch]),
-            ssh_user_field,
-        ], spacing=8),
+            ssh_user_row,
+        ], spacing=8, scroll=ft.ScrollMode.AUTO),
         padding=10,
         expand=True
     )
