@@ -16,6 +16,7 @@ import time
 import uuid
 import binascii
 import subprocess
+import shlex
 import urllib.request
 import re
 import threading
@@ -472,6 +473,35 @@ def _cleanup_ssh_session(device_id):
         session["client"].close()
     except Exception:
         pass
+
+
+# SSH 会话超时清理
+SSH_SESSION_TIMEOUT = 300  # 5 分钟
+_ssh_cleaner_started = False
+_ssh_cleaner_lock = threading.Lock()
+
+
+def _start_ssh_cleaner():
+    global _ssh_cleaner_started
+    with _ssh_cleaner_lock:
+        if _ssh_cleaner_started:
+            return
+        _ssh_cleaner_started = True
+    t = threading.Thread(target=_ssh_cleaner_loop, daemon=True)
+    t.start()
+
+
+def _ssh_cleaner_loop():
+    while True:
+        time.sleep(30)
+        now = time.time()
+        dead = [
+            did for did, s in list(ssh_sessions.items())
+            if now - s.get("last_active", 0) > SSH_SESSION_TIMEOUT
+        ]
+        for did in dead:
+            add_log(f"SSH 会话超时清理: {did[:8]}...", "info")
+            _cleanup_ssh_session(did)
 
 
 # ============ Flask 路由 ============
@@ -1078,8 +1108,7 @@ def run_command(cmd_id):
     try:
         add_log(f"执行命令: {cmd.get('name', cmd_str[:20])}", "warning")
         result = subprocess.run(
-            cmd_str,
-            shell=True,
+            shlex.split(cmd_str),
             capture_output=True,
             text=True,
             timeout=30
@@ -1151,8 +1180,8 @@ def ssh_connect():
 
     data = request.get_json() or {}
     password = data.get('password', '')
-    cols = data.get('cols', 80)
-    rows = data.get('rows', 24)
+    cols = max(10, min(500, int(data.get('cols', 80))))
+    rows = max(1, min(200, int(data.get('rows', 24))))
     if not password:
         return jsonify({"status": "error", "message": "需要密码"}), 400
 
@@ -1180,15 +1209,30 @@ def ssh_connect():
         password = None  # 清除密码引用
 
         channel = client.get_transport().open_session()
-        channel.get_pty(term='xterm', width=cols, height=rows)
-        channel.exec_command('/bin/bash -i')
+        has_pty = True
+        try:
+            channel.get_pty(term='xterm', width=cols, height=rows)
+        except paramiko.SSHException:
+            has_pty = False  # Windows OpenSSH 不支持 PTY
+
+        # 选择 shell: 配置 > 平台检测 > 默认
+        ssh_shell = config.get('ssh_shell', '')
+        if ssh_shell:
+            shell_cmd = ssh_shell
+        elif platform.system() == 'Windows':
+            shell_cmd = 'powershell.exe -NoLogo'
+        else:
+            shell_cmd = '/bin/bash -i'
+        channel.exec_command(shell_cmd)
 
         ssh_sessions[device_id] = {
             "client": client,
             "channel": channel,
             "buffer": bytearray(),
             "lock": threading.Lock(),
-            "thread": None
+            "thread": None,
+            "has_pty": has_pty,
+            "last_active": time.time()
         }
 
         reader_thread = threading.Thread(
@@ -1197,6 +1241,7 @@ def ssh_connect():
         reader_thread.start()
         ssh_sessions[device_id]["thread"] = reader_thread
 
+        _start_ssh_cleaner()
         add_log(f"SSH 已连接: {ssh_user}@127.0.0.1 (设备: {device_id[:8]}...)", "success")
         return jsonify({"status": "ok", "message": "SSH 已连接"})
 
@@ -1227,6 +1272,7 @@ def ssh_input():
 
     try:
         session["channel"].send(input_text)
+        session["last_active"] = time.time()
         return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -1238,12 +1284,14 @@ def ssh_resize():
     """更新 SSH 会话的终端窗口尺寸"""
     device_id = request.headers.get('X-Device-ID')
     data = request.get_json() or {}
-    cols = data.get('cols', 80)
-    rows = data.get('rows', 24)
+    cols = max(10, min(500, int(data.get('cols', 80))))
+    rows = max(1, min(200, int(data.get('rows', 24))))
 
     session = ssh_sessions.get(device_id)
     if not session:
         return jsonify({"status": "error", "message": "无活跃的 SSH 会话"}), 400
+    if not session.get("has_pty", True):
+        return jsonify({"status": "error", "message": "当前环境不支持 PTY 调整"}), 400
 
     _set_pty_size(device_id, cols, rows)
     return jsonify({"status": "ok"})
@@ -1262,11 +1310,18 @@ def ssh_output():
     with session["lock"]:
         data = bytes(session["buffer"])
 
-    text = data.decode('utf-8', errors='replace')
-    # 过滤 ANSI 转义序列: CSI (\x1b[ + 参数 + 终结符) 和 OSC (\x1b]...\x07 或 \x1b]...\x1b\\)
-    # 中间字节 (0x20-0x2F) 可在参数字节和终结字节之间出现
+    session["last_active"] = time.time()
+
+    # Windows 控制台默认非 UTF-8
+    if platform.system() == 'Windows':
+        encoding = load_config().get('ssh_encoding', 'cp936')
+    else:
+        encoding = 'utf-8'
+    text = data.decode(encoding, errors='replace')
+    # 过滤 ANSI 转义序列: CSI OSC DCS SOS PM APC
     text = re.sub(r'\x1b\[[0-9;?]*[\x20-\x2f]*[\x40-\x7e]', '', text)
     text = re.sub(r'\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)', '', text)
+    text = re.sub(r'\x1b[PX^_].*?(?:\x1b\\|\x07)', '', text)
     # 处理退格: 每遇到 \x08 就删除它前面的字符 (模拟终端擦除)
     while '\x08' in text:
         i = text.index('\x08')
@@ -1294,6 +1349,7 @@ def ssh_heartbeat():
     if not session:
         return jsonify({"status": "ok", "alive": False})
 
+    session["last_active"] = time.time()
     transport = session["client"].get_transport()
     alive = transport is not None and transport.is_active()
     return jsonify({"status": "ok", "alive": alive})
