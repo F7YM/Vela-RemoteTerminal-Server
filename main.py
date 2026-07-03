@@ -1275,7 +1275,7 @@ def ssh_output():
         else:
             text = text[i+1:]
     # 过滤残留控制字符 (保留 \n \t)
-    text = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f]', '', text)
+    text = re.sub(r'[\x00-\x08\x0b-\x0d\x0e-\x1f]', '', text)
     # 过滤 PAM/systemd audit 噪声行 (以 audit 字段开头的 key=value;... 行)
     text = re.sub(r'^(?:user|hostname|bootid|pid|type|cwd|_COMM|_EXE|_UID|_GID|_PID|_TRANSPORT|SYSLOG_FACILITY)=[^;\n]*(?:;[a-z_]+=[^;\n]*)*\n', '', text, flags=re.MULTILINE)
     # 截断总长度，保留尾部最新输出
