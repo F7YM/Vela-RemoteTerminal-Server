@@ -506,14 +506,43 @@ def _ssh_cleaner_loop():
 
 # ============ Flask 路由 ============
 
-def require_trusted(f):
-    """验证设备是否已信任的装饰器"""
+def decrypt_body(f):
+    """解密 XOR 加密的请求体。客户端发 { data: hex, encrypted: true } 时自动解密回原始 JSON"""
     from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
-        device_id = request.headers.get('X-Device-ID')
-        if not device_id:
+        data = request.get_json(force=True, silent=True) or {}
+        if data.get('encrypted'):
+            key = load_config().get('encryption_key', '')
+            if key:
+                try:
+                    decrypted = _xor_crypt(data['data'], key)
+                    data = json.loads(decrypted)
+                except (binascii.Error, json.JSONDecodeError, KeyError, ValueError):
+                    return jsonify({"status": "error", "message": "解密失败"}), 400
+        request._decrypted_data = data
+        return f(*args, **kwargs)
+    return decorated
+
+
+def require_trusted(f):
+    """验证设备是否已信任的装饰器，支持加密的 Device ID"""
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        raw_id = request.headers.get('X-Device-ID')
+        if not raw_id:
             return jsonify({"status": "error", "message": "Missing device ID"}), 401
+        # 尝试 XOR 解密 Device ID，失败则用原文
+        device_id = raw_id
+        try:
+            key = load_config().get('encryption_key', '')
+            if key:
+                decrypted = _xor_crypt(raw_id, key)
+                if decrypted:
+                    device_id = decrypted
+        except (binascii.Error, ValueError):
+            pass
         devices = load_trusted_devices()
         trusted = any(d.get('device_id') == device_id for d in devices)
         if not trusted:
@@ -1253,11 +1282,12 @@ def ssh_connect():
 
 
 @flask_app.route('/api/ssh/input', methods=['POST'])
+@decrypt_body
 @require_trusted
 def ssh_input():
     """向 SSH 会话发送输入"""
     device_id = request.headers.get('X-Device-ID')
-    data = request.get_json()
+    data = request._decrypted_data
 
     session = ssh_sessions.get(device_id)
     if not session:
