@@ -910,15 +910,15 @@ def keyboard_input():
         data = request.get_json()
         if not data:
             return jsonify({"status": "error", "message": "Invalid JSON"}), 400
-        
+
         key = data.get('key', '')
         if not key:
             return jsonify({"status": "error", "message": "No key specified"}), 400
-        
+
         # 映射按键名称
         key_map = {
             'left': 'Left',
-            'right': 'Right', 
+            'right': 'Right',
             'up': 'Up',
             'down': 'Down',
             'enter': 'Return',
@@ -928,9 +928,9 @@ def keyboard_input():
             'backspace': 'BackSpace'
         }
         xdotool_key = key_map.get(key, key)
-        
+
         system = platform.system()
-        
+
         if system == "Windows":
             import ctypes
             # Windows虚拟键码
@@ -948,12 +948,12 @@ def keyboard_input():
                 subprocess.run(['which', 'xdotool'], check=True, capture_output=True)
             except (subprocess.CalledProcessError, FileNotFoundError):
                 return jsonify({
-                    "status": "error", 
+                    "status": "error",
                     "message": "请安装xdotool: sudo apt install xdotool 或 sudo dnf install xdotool"
                 }), 500
-            
+
             try:
-                subprocess.run(['xdotool', 'key', xdotool_key], 
+                subprocess.run(['xdotool', 'key', xdotool_key],
                              check=True, timeout=2, capture_output=True)
             except (subprocess.CalledProcessError, FileNotFoundError):
                 return jsonify({"status": "error", "message": "xdotool执行失败"}), 500
@@ -963,10 +963,153 @@ def keyboard_input():
                 subprocess.run(['cliclick', f'ku:{key}'], check=True, timeout=2, capture_output=True)
             except (subprocess.CalledProcessError, FileNotFoundError):
                 return jsonify({"status": "error", "message": "cliclick not installed"}), 500
-        
+
         return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@flask_app.route('/api/touchpad/move', methods=['POST'])
+@require_trusted
+def touchpad_move():
+    """触控板移动（相对移动）"""
+    try:
+        print(f"[触控板] Content-Type: {request.content_type}")
+        print(f"[触控板] Raw data: {request.data[:200]}")
+        data = request.get_json(force=True, silent=True)
+        print(f"[触控板] 收到数据: {data}, 类型: {type(data)}")
+        if not data:
+            print(f"[触控板] 数据为空")
+            return jsonify({"status": "error", "message": "Invalid JSON"}), 400
+
+        dx = int(data.get('dx', 0))
+        dy = int(data.get('dy', 0))
+        print(f"[触控板] 移动: dx={dx}, dy={dy}")
+
+        # 限制移动距离
+        dx = max(-500, min(500, dx))
+        dy = max(-500, min(500, dy))
+
+        system = platform.system()
+
+        if system == "Windows":
+            import ctypes
+            ctypes.windll.user32.mouse_event(1, dx, dy, 0, 0)  # MOUSEEVENTF_MOVE = 1
+        elif system == "Linux":
+            try:
+                subprocess.run(['xdotool', 'mousemove_relative', '--', str(dx), str(dy)],
+                             check=True, timeout=2, capture_output=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                try:
+                    ydotool_socket = os.environ.get('YDOTOOL_SOCKET', '/run/user/0/.ydotool_socket')
+                    env = os.environ.copy()
+                    env['YDOTOOL_SOCKET'] = ydotool_socket
+                    subprocess.run(['ydotool', 'mousemove', '--', str(dx), str(dy)],
+                                 check=True, timeout=2, capture_output=True, env=env)
+                except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                    return jsonify({"status": "error", "message": "Move tool not available"}), 500
+        elif system == "Darwin":
+            try:
+                subprocess.run(['cliclick', f'm:+{dx},+{dy}'], check=True, timeout=2, capture_output=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                return jsonify({"status": "error", "message": "cliclick not installed"}), 500
+        else:
+            return jsonify({"status": "error", "message": "Unsupported system"}), 500
+
+        return jsonify({"status": "ok"})
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "Invalid delta values"}), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": "Move failed"}), 500
+
+
+@flask_app.route('/api/touchpad/click', methods=['POST'])
+@require_trusted
+def touchpad_click():
+    """触控板点击"""
+    try:
+        data = request.get_json() or {}
+        button = data.get('button', 'left')  # left, right, middle
+
+        system = platform.system()
+
+        if system == "Windows":
+            import ctypes
+            if button == 'left':
+                ctypes.windll.user32.mouse_event(2, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTDOWN
+                ctypes.windll.user32.mouse_event(4, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTUP
+            elif button == 'right':
+                ctypes.windll.user32.mouse_event(8, 0, 0, 0, 0)  # MOUSEEVENTF_RIGHTDOWN
+                ctypes.windll.user32.mouse_event(16, 0, 0, 0, 0)  # MOUSEEVENTF_RIGHTUP
+        elif system == "Linux":
+            btn_map = {'left': '1', 'middle': '2', 'right': '3'}
+            btn = btn_map.get(button, '1')
+            try:
+                subprocess.run(['xdotool', 'click', btn], check=True, timeout=2, capture_output=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                try:
+                    ydotool_socket = os.environ.get('YDOTOOL_SOCKET', '/run/user/0/.ydotool_socket')
+                    env = os.environ.copy()
+                    env['YDOTOOL_SOCKET'] = ydotool_socket
+                    code_map = {'left': '0xC0', 'right': '0xC1', 'middle': '0xC2'}
+                    code = code_map.get(button, '0xC0')
+                    subprocess.run(['ydotool', 'click', code], check=True, timeout=2, capture_output=True, env=env)
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    return jsonify({"status": "error", "message": "Click tool not available"}), 500
+        elif system == "Darwin":
+            try:
+                subprocess.run(['cliclick', 'c:.'], check=True, timeout=2, capture_output=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                return jsonify({"status": "error", "message": "cliclick not installed"}), 500
+        else:
+            return jsonify({"status": "error", "message": "Unsupported system"}), 500
+
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": "Click failed"}), 500
+
+
+@flask_app.route('/api/touchpad/scroll', methods=['POST'])
+@require_trusted
+def touchpad_scroll():
+    """触控板滚动"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"status": "error", "message": "Invalid JSON"}), 400
+
+        dy = int(data.get('dy', 0))
+        dy = max(-500, min(500, dy))
+
+        system = platform.system()
+
+        if system == "Windows":
+            import ctypes
+            # MOUSEEVENTF_WHEEL = 0x0800, WHEEL_DELTA = 120
+            amount = int(dy * 120 / 10)
+            ctypes.windll.user32.mouse_event(0x0800, 0, 0, amount, 0)
+        elif system == "Linux":
+            # xdotool 滚动: 正数向下，负数向上
+            btn = '5' if dy > 0 else '4'
+            clicks = abs(dy) // 10
+            try:
+                for _ in range(clicks):
+                    subprocess.run(['xdotool', 'click', btn], check=True, timeout=2, capture_output=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                return jsonify({"status": "error", "message": "Scroll tool not available"}), 500
+        elif system == "Darwin":
+            try:
+                subprocess.run(['cliclick', f'w:{dy}'], check=True, timeout=2, capture_output=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                return jsonify({"status": "error", "message": "cliclick not installed"}), 500
+        else:
+            return jsonify({"status": "error", "message": "Unsupported system"}), 500
+
+        return jsonify({"status": "ok"})
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "Invalid scroll value"}), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": "Scroll failed"}), 500
 
 
 @flask_app.route('/api/music/status', methods=['GET'])
