@@ -526,23 +526,13 @@ def decrypt_body(f):
 
 
 def require_trusted(f):
-    """验证设备是否已信任的装饰器，支持加密的 Device ID"""
+    """验证设备是否已信任的装饰器"""
     from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
-        raw_id = request.headers.get('X-Device-ID')
-        if not raw_id:
+        device_id = request.headers.get('X-Device-ID')
+        if not device_id:
             return jsonify({"status": "error", "message": "Missing device ID"}), 401
-        # 尝试 XOR 解密 Device ID，失败则用原文
-        device_id = raw_id
-        try:
-            key = load_config().get('encryption_key', '')
-            if key:
-                decrypted = _xor_crypt(raw_id, key)
-                if decrypted:
-                    device_id = decrypted
-        except (binascii.Error, ValueError):
-            pass
         devices = load_trusted_devices()
         trusted = any(d.get('device_id') == device_id for d in devices)
         if not trusted:
