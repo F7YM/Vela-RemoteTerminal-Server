@@ -1268,8 +1268,8 @@ def music_cover():
             # 高斯模糊
             blurred = img.filter(ImageFilter.GaussianBlur(radius=30))
 
-            # 压暗：用 Point 操作让每个像素亮度降低 60%
-            darkened = blurred.point(lambda p: int(p * 0.4))
+            # 压暗：用 Point 操作让每个像素亮度降低 40%
+            darkened = blurred.point(lambda p: int(p * 0.6))
 
             darkened.save(cache_path, 'JPEG', quality=70)
 
