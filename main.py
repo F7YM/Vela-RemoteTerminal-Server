@@ -803,13 +803,15 @@ def capture_screen():
         
         # 压缩图片
         img = Image.open(tmp_path)
+        real_w, real_h = img.size
         if img.mode == 'RGBA':
             img = img.convert('RGB')
-        img.thumbnail((300, 300), Image.LANCZOS)
+        img.thumbnail((480, 480), Image.LANCZOS)
+        thumb_w, thumb_h = img.size
         
         filename = f'screen_{uuid.uuid4().hex[:8]}.jpg'
         output_path = os.path.join(static_dir, filename)
-        img.save(output_path, 'JPEG', quality=60, optimize=False)
+        img.save(output_path, 'JPEG', quality=75, optimize=False)
         
         # 清理临时文件
         if os.path.exists(tmp_path):
@@ -818,7 +820,14 @@ def capture_screen():
         # 生成URL
         host = request.host
         url = f"http://{host}/static/{filename}"
-        return jsonify({"status": "ok", "url": url})
+        return jsonify({
+            "status": "ok",
+            "url": url,
+            "screen_width": real_w,
+            "screen_height": real_h,
+            "image_width": thumb_w,
+            "image_height": thumb_h
+        })
     
     except Exception as e:
         print(f"[截图] 异常: {e}")
