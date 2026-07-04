@@ -801,17 +801,15 @@ def capture_screen():
         if not success:
             return jsonify({"status": "error", "message": "Screenshot failed"}), 500
         
-        # 压缩图片
+        # 保存为 JPEG（轻微压缩，保留完整分辨率用于 1:1 坐标映射）
         img = Image.open(tmp_path)
         real_w, real_h = img.size
         if img.mode == 'RGBA':
             img = img.convert('RGB')
-        img.thumbnail((1280, 1280), Image.LANCZOS)
-        thumb_w, thumb_h = img.size
         
         filename = f'screen_{uuid.uuid4().hex[:8]}.jpg'
         output_path = os.path.join(static_dir, filename)
-        img.save(output_path, 'JPEG', quality=85, optimize=False)
+        img.save(output_path, 'JPEG', quality=80, optimize=False)
         
         # 清理临时文件
         if os.path.exists(tmp_path):
@@ -825,8 +823,8 @@ def capture_screen():
             "url": url,
             "screen_width": real_w,
             "screen_height": real_h,
-            "image_width": thumb_w,
-            "image_height": thumb_h
+            "image_width": real_w,
+            "image_height": real_h
         })
     
     except Exception as e:
