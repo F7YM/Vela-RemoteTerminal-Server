@@ -21,6 +21,7 @@ import urllib.request
 import re
 import threading
 import paramiko
+import hashlib
 from datetime import datetime
 from flask import Flask, request, jsonify, send_file, abort
 from flask_cors import CORS
@@ -1115,28 +1116,32 @@ def touchpad_scroll():
 @flask_app.route('/api/music/status', methods=['GET'])
 @require_trusted
 def music_status():
-    """获取音乐播放状态（跨平台）"""
+    """获取音乐播放状态（跨平台），含封面 hash"""
     system = platform.system()
     try:
+        cover_hash = None
         if system == "Linux":
-            # 使用 playerctl 或 dbus
             try:
-                result = subprocess.run(['playerctl', 'metadata', '--format', '{{title}}|||{{artist}}|||{{status}}'],
-                                       capture_output=True, text=True, timeout=3)
+                result = subprocess.run(
+                    ['playerctl', 'metadata', '--format', '{{title}}|||{{artist}}|||{{status}}'],
+                    capture_output=True, text=True, timeout=3)
                 if result.returncode == 0 and result.stdout.strip():
                     parts = result.stdout.strip().split('|||')
+                    cover_hash = _get_cover_hash_linux()
                     return jsonify({
                         "status": "ok",
                         "title": parts[0] if len(parts) > 0 else "",
                         "artist": parts[1] if len(parts) > 1 else "",
-                        "playing": parts[2] == "Playing" if len(parts) > 2 else False
+                        "playing": parts[2] == "Playing" if len(parts) > 2 else False,
+                        "cover_hash": cover_hash
                     })
             except FileNotFoundError:
                 pass
-            return jsonify({"status": "ok", "title": "", "artist": "", "playing": False})
-        
+            return jsonify({"status": "ok", "title": "", "artist": "", "playing": False, "cover_hash": None})
+
         elif system == "Darwin":
-            result = subprocess.run(['osascript', '-e', 
+            cover_hash = _get_cover_hash_darwin()
+            result = subprocess.run(['osascript', '-e',
                 'tell application "System Events" to get {name, artist} of current track of application "Music"'],
                 capture_output=True, text=True, timeout=3)
             if result.returncode == 0:
@@ -1145,19 +1150,18 @@ def music_status():
                     "status": "ok",
                     "title": parts[0] if len(parts) > 0 else "",
                     "artist": parts[1] if len(parts) > 1 else "",
-                    "playing": True
+                    "playing": True,
+                    "cover_hash": cover_hash
                 })
-        
+
         elif system == "Windows":
-            # Windows 媒体控制
             try:
                 import ctypes
-                # 简化处理，返回基础状态
-                return jsonify({"status": "ok", "title": "", "artist": "", "playing": False})
+                return jsonify({"status": "ok", "title": "", "artist": "", "playing": False, "cover_hash": None})
             except:
                 pass
-        
-        return jsonify({"status": "ok", "title": "", "artist": "", "playing": False})
+
+        return jsonify({"status": "ok", "title": "", "artist": "", "playing": False, "cover_hash": None})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -1188,6 +1192,94 @@ def music_prev():
 def music_next():
     """下一曲"""
     return _music_control('next')
+
+
+def _get_cover_hash_linux():
+    """Linux: 获取封面图的 hash（基于 artUrl 路径）"""
+    try:
+        result = subprocess.run(
+            ['playerctl', 'metadata', 'mpris:artUrl'],
+            capture_output=True, text=True, timeout=2)
+        if result.returncode == 0 and result.stdout.strip():
+            art_url = result.stdout.strip()
+            # artUrl 格式: file:///tmp/.tmpXXXXXX.jpg
+            if art_url.startswith('file://'):
+                filepath = art_url[7:]
+                if os.path.exists(filepath):
+                    with open(filepath, 'rb') as f:
+                        return hashlib.md5(f.read()).hexdigest()
+    except Exception:
+        pass
+    return None
+
+
+def _get_cover_hash_darwin():
+    """macOS: 尝试从 Music.app 导出的临时封面获取 hash"""
+    return None
+
+
+def _get_cover_source_path():
+    """获取当前封面图的源文件路径，用于后续处理"""
+    system = platform.system()
+    if system == "Linux":
+        try:
+            result = subprocess.run(
+                ['playerctl', 'metadata', 'mpris:artUrl'],
+                capture_output=True, text=True, timeout=2)
+            if result.returncode == 0 and result.stdout.strip():
+                art_url = result.stdout.strip()
+                if art_url.startswith('file://'):
+                    filepath = art_url[7:]
+                    if os.path.exists(filepath):
+                        return filepath
+        except Exception:
+            pass
+    return None
+
+
+@flask_app.route('/api/music/cover', methods=['GET'])
+@require_trusted
+def music_cover():
+    """获取处理后的封面图（高斯模糊 + 压暗），适合手表端做背景"""
+    try:
+        from PIL import Image, ImageFilter
+
+        source_path = _get_cover_source_path()
+        if not source_path:
+            return jsonify({"status": "ok", "url": None})
+
+        # 用文件内容 hash 作为缓存 key
+        with open(source_path, 'rb') as f:
+            file_hash = hashlib.md5(f.read()).hexdigest()
+
+        static_dir = get_static_dir()
+        cache_filename = f'cover_{file_hash}.jpg'
+        cache_path = os.path.join(static_dir, cache_filename)
+
+        # 缓存命中，直接返回
+        if not os.path.exists(cache_path):
+            img = Image.open(source_path)
+            if img.mode == 'RGBA':
+                img = img.convert('RGB')
+
+            # 先缩放到合适大小（节省处理时间）
+            img.thumbnail((600, 600), Image.LANCZOS)
+
+            # 高斯模糊
+            blurred = img.filter(ImageFilter.GaussianBlur(radius=30))
+
+            # 压暗：用 Point 操作让每个像素亮度降低 60%
+            darkened = blurred.point(lambda p: int(p * 0.4))
+
+            darkened.save(cache_path, 'JPEG', quality=70)
+
+        host = request.host
+        url = f"http://{host}/static/{cache_filename}"
+        return jsonify({"status": "ok", "url": url})
+
+    except Exception as e:
+        print(f"[封面] 处理失败: {e}")
+        return jsonify({"status": "ok", "url": None})
 
 
 def _music_control(action):
