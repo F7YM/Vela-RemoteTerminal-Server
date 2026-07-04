@@ -806,12 +806,12 @@ def capture_screen():
         real_w, real_h = img.size
         if img.mode == 'RGBA':
             img = img.convert('RGB')
-        img.thumbnail((480, 480), Image.LANCZOS)
+        img.thumbnail((1280, 1280), Image.LANCZOS)
         thumb_w, thumb_h = img.size
         
         filename = f'screen_{uuid.uuid4().hex[:8]}.jpg'
         output_path = os.path.join(static_dir, filename)
-        img.save(output_path, 'JPEG', quality=75, optimize=False)
+        img.save(output_path, 'JPEG', quality=85, optimize=False)
         
         # 清理临时文件
         if os.path.exists(tmp_path):
