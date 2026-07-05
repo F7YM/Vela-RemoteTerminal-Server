@@ -820,13 +820,16 @@ def capture_screen():
         # 生成URL
         host = request.host
         url = f"http://{host}/static/{filename}"
+        cx, cy = _get_cursor_position()
         return jsonify({
             "status": "ok",
             "url": url,
             "screen_width": real_w,
             "screen_height": real_h,
             "image_width": half_w,
-            "image_height": half_h
+            "image_height": half_h,
+            "cursor_x": cx,
+            "cursor_y": cy
         })
     
     except Exception as e:
@@ -904,8 +907,9 @@ def screen_click():
                 return jsonify({"status": "error", "message": "cliclick not installed"}), 500
         else:
             return jsonify({"status": "error", "message": "Unsupported system"}), 500
-        
-        return jsonify({"status": "ok"})
+
+        cx, cy = _get_cursor_position()
+        return jsonify({"status": "ok", "x": cx, "y": cy})
     except (ValueError, TypeError):
         return jsonify({"status": "error", "message": "Invalid coordinates"}), 400
     except Exception as e:
@@ -977,6 +981,38 @@ def keyboard_input():
         return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+def _get_cursor_position():
+    system = platform.system()
+    try:
+        if system == "Windows":
+            import ctypes
+            from ctypes import wintypes
+            pt = wintypes.POINT()
+            ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+            return pt.x, pt.y
+        elif system == "Linux":
+            result = subprocess.run(['xdotool', 'getmouselocation', '--shell'],
+                                   capture_output=True, text=True, timeout=2)
+            if result.returncode == 0:
+                x = y = 0
+                for line in result.stdout.strip().split('\n'):
+                    if line.startswith('X='):
+                        x = int(line[2:])
+                    elif line.startswith('Y='):
+                        y = int(line[2:])
+                return x, y
+        elif system == "Darwin":
+            result = subprocess.run(['cliclick', 'p:.'],
+                                   capture_output=True, text=True, timeout=2)
+            if result.returncode == 0:
+                parts = result.stdout.strip().split(',')
+                if len(parts) == 2:
+                    return int(parts[0]), int(parts[1])
+    except Exception:
+        pass
+    return None, None
 
 
 @flask_app.route('/api/touchpad/move', methods=['POST'])
