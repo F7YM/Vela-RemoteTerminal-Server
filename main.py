@@ -1256,22 +1256,18 @@ def music_status():
                     si = subprocess.STARTUPINFO()
                     si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 result = subprocess.run(['powershell', '-NoProfile', '-WindowStyle', 'Hidden', '-Command', '''
-Add-Type -AssemblyName System.Runtime.WindowsRuntime
-$taskGen = ([System.WindowsRuntimeSystemExtensions].GetMethods() | ? { $_.Name -eq "AsTask" -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq "IAsyncOperation`1" })[0]
-function WaitAsync($op, $t) {
-    $task = $taskGen.MakeGenericMethod($t).Invoke($null, @($op))
-    $task.Wait(2000) | Out-Null
-    if ($task.IsFaulted) { return $null }
-    return $task.Result
-}
 [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime] | Out-Null
-$mgr = WaitAsync ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
-if ($mgr) {
+$op = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()
+while ($op.Status -eq 0) { Start-Sleep -Milliseconds 50 }
+if ($op.Status -eq 1) {
+    $mgr = $op.GetResults()
     $s = $mgr.GetCurrentSession()
     if ($s) {
         $pi = $s.GetPlaybackInfo()
-        $props = WaitAsync ($s.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])
-        if ($props) {
+        $mop = $s.TryGetMediaPropertiesAsync()
+        while ($mop.Status -eq 0) { Start-Sleep -Milliseconds 50 }
+        if ($mop.Status -eq 1) {
+            $props = $mop.GetResults()
             Write-Output "$($props.Title)|||$($props.Artist)|||$($pi.PlaybackStatus)"
         }
     }
