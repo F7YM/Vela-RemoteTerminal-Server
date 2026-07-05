@@ -33,8 +33,8 @@ flask_app = Flask(__name__)
 CORS(flask_app)
 
 # 常量
-API_LEVEL = 4
-VERSION = "1.3.0"
+API_LEVEL = 5
+VERSION = "1.4.0"
 
 # 存储路径
 TRUSTED_DEVICES_FILE = "trusted_devices.json"
