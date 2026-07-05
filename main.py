@@ -1250,7 +1250,12 @@ def music_status():
 
         elif system == "Windows":
             try:
-                result = subprocess.run(['powershell', '-NoProfile', '-Command', '''
+                import sys
+                si = None
+                if sys.platform == 'win32':
+                    si = subprocess.STARTUPINFO()
+                    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                result = subprocess.run(['powershell', '-NoProfile', '-WindowStyle', 'Hidden', '-Command', '''
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 $taskGen = ([System.WindowsRuntimeSystemExtensions].GetMethods() | ? { $_.Name -eq "AsTask" -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq "IAsyncOperation`1" })[0]
 function WaitAsync($op, $t) {
@@ -1271,7 +1276,7 @@ if ($mgr) {
         }
     }
 }
-'''], capture_output=True, text=True, timeout=8)
+'''], capture_output=True, text=True, timeout=8, startupinfo=si)
                 if result.returncode == 0 and result.stdout.strip():
                     parts = result.stdout.strip().split('|||')
                     status_str = parts[2] if len(parts) > 2 else ''
