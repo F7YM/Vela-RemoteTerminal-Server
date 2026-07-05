@@ -1252,23 +1252,41 @@ def music_status():
             try:
                 from winsdk.windows.media.control import \
                     GlobalSystemMediaTransportControlsSessionManager as GSMTC
+                from winsdk.windows.storage.streams import Buffer, InputStreamOptions
                 import asyncio
 
                 async def _get_media():
                     sessions = await GSMTC.request_async()
                     session = sessions.get_current_session()
                     if not session:
-                        return '', '', False
+                        return '', '', False, None
                     props = await session.try_get_media_properties_async()
                     playback = session.get_playback_info()
                     title = props.title if props and hasattr(props, 'title') else ''
                     artist = props.artist if props and hasattr(props, 'artist') else ''
                     playing = playback.playback_status.value == 4
-                    return title, artist, playing
+
+                    cover_hash = None
+                    if props and hasattr(props, 'thumbnail') and props.thumbnail:
+                        try:
+                            stream = await props.thumbnail.open_read_async()
+                            buf = Buffer(2 * 1024 * 1024)
+                            await stream.read_async(buf, buf.capacity, InputStreamOptions.READ_AHEAD)
+                            cover_data = bytearray(buf)
+                            if len(cover_data) > 0:
+                                cover_hash = hashlib.md5(cover_data).hexdigest()
+                                static_dir = get_static_dir()
+                                cache_path = os.path.join(static_dir, f'cover_{cover_hash}.jpg')
+                                if not os.path.exists(cache_path):
+                                    with open(cache_path, 'wb') as f:
+                                        f.write(cover_data)
+                        except Exception:
+                            pass
+                    return title, artist, playing, cover_hash
 
                 loop = asyncio.new_event_loop()
                 try:
-                    title, artist, playing = loop.run_until_complete(_get_media())
+                    title, artist, playing, cover_hash = loop.run_until_complete(_get_media())
                 finally:
                     loop.close()
 
@@ -1277,7 +1295,7 @@ def music_status():
                     "title": title,
                     "artist": artist,
                     "playing": playing,
-                    "cover_hash": None
+                    "cover_hash": cover_hash
                 })
             except Exception:
                 pass
@@ -1378,7 +1396,6 @@ def _get_cover_hash_darwin():
 
 
 def _get_cover_source_path():
-    """获取当前封面图的源文件路径，用于后续处理"""
     system = platform.system()
     if system == "Linux":
         try:
@@ -1391,6 +1408,42 @@ def _get_cover_source_path():
                     filepath = art_url[7:]
                     if os.path.exists(filepath):
                         return filepath
+        except Exception:
+            pass
+    elif system == "Windows":
+        try:
+            from winsdk.windows.media.control import \
+                GlobalSystemMediaTransportControlsSessionManager as GSMTC
+            from winsdk.windows.storage.streams import Buffer, InputStreamOptions
+            import asyncio
+
+            async def _get_cover():
+                sessions = await GSMTC.request_async()
+                session = sessions.get_current_session()
+                if not session:
+                    return None
+                props = await session.try_get_media_properties_async()
+                if not props or not hasattr(props, 'thumbnail') or not props.thumbnail:
+                    return None
+                stream = await props.thumbnail.open_read_async()
+                buf = Buffer(2 * 1024 * 1024)
+                await stream.read_async(buf, buf.capacity, InputStreamOptions.READ_AHEAD)
+                cover_data = bytearray(buf)
+                if len(cover_data) > 0:
+                    h = hashlib.md5(cover_data).hexdigest()
+                    static_dir = get_static_dir()
+                    cache_path = os.path.join(static_dir, f'cover_{h}.jpg')
+                    if not os.path.exists(cache_path):
+                        with open(cache_path, 'wb') as f:
+                            f.write(cover_data)
+                    return cache_path
+                return None
+
+            loop = asyncio.new_event_loop()
+            try:
+                return loop.run_until_complete(_get_cover())
+            finally:
+                loop.close()
         except Exception:
             pass
     return None
