@@ -1158,6 +1158,14 @@ def touchpad_scroll():
         return jsonify({"status": "error", "message": "Scroll failed"}), 500
 
 
+@flask_app.route('/api/touchpad/position', methods=['GET'])
+@require_trusted
+def touchpad_position():
+    """获取鼠标位置"""
+    cx, cy = _get_cursor_position()
+    return jsonify({"status": "ok", "x": cx, "y": cy})
+
+
 @flask_app.route('/api/music/status', methods=['GET'])
 @require_trusted
 def music_status():
