@@ -1276,7 +1276,7 @@ def music_status():
                             if len(cover_data) > 0:
                                 cover_hash = hashlib.md5(cover_data).hexdigest()
                                 static_dir = get_static_dir()
-                                cache_path = os.path.join(static_dir, f'cover_{cover_hash}.jpg')
+                                cache_path = os.path.join(static_dir, f'raw_cover_{cover_hash}.jpg')
                                 if not os.path.exists(cache_path):
                                     with open(cache_path, 'wb') as f:
                                         f.write(cover_data)
