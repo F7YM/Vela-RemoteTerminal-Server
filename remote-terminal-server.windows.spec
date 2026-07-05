@@ -1,12 +1,22 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_all
+
+# 获取paramiko的所有依赖
+datas, binaries, hiddenimports = collect_all('paramiko')
+
+# 获取cryptography的所有依赖
+crypto_datas, crypto_binaries, crypto_hiddenimports = collect_all('cryptography')
+datas += crypto_datas
+binaries += crypto_binaries
+hiddenimports += crypto_hiddenimports
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
-    datas=[('C:\\Users\\float\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\site-packages\\flet', 'flet')],
-    hiddenimports=['paramiko', 'cryptography', 'bcrypt', 'pynacl', 'invoke'],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports + ['bcrypt', 'pynacl', 'invoke'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -29,7 +39,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
