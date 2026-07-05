@@ -1166,6 +1166,47 @@ def touchpad_position():
     return jsonify({"status": "ok", "x": cx, "y": cy})
 
 
+@flask_app.route('/api/touchpad/move-to', methods=['POST'])
+@require_trusted
+def touchpad_move_to():
+    """移动鼠标到绝对坐标（不点击）"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"status": "error", "message": "Invalid JSON"}), 400
+        x = int(data.get('x', 0))
+        y = int(data.get('y', 0))
+        x = max(0, min(x, 10000))
+        y = max(0, min(y, 10000))
+        system = platform.system()
+        if system == "Windows":
+            import ctypes
+            ctypes.windll.user32.SetCursorPos(x, y)
+        elif system == "Linux":
+            try:
+                subprocess.run(['xdotool', 'mousemove', str(x), str(y)],
+                             check=True, timeout=2, capture_output=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                try:
+                    ydotool_socket = os.environ.get('YDOTOOL_SOCKET', '/run/user/0/.ydotool_socket')
+                    env = os.environ.copy()
+                    env['YDOTOOL_SOCKET'] = ydotool_socket
+                    subprocess.run(['ydotool', 'mousemove', '--', str(x), str(y)],
+                                 check=True, timeout=2, capture_output=True, env=env)
+                except:
+                    pass
+        elif system == "Darwin":
+            try:
+                subprocess.run(['cliclick', f'm:{x},{y}'], check=True, timeout=2, capture_output=True)
+            except:
+                pass
+        return jsonify({"status": "ok"})
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "Invalid coordinates"}), 400
+    except Exception:
+        return jsonify({"status": "error", "message": "Move failed"}), 500
+
+
 @flask_app.route('/api/music/status', methods=['GET'])
 @require_trusted
 def music_status():
