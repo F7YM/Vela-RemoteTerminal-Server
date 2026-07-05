@@ -1250,17 +1250,21 @@ def music_status():
 
         elif system == "Windows":
             try:
-                from py_now_playing import PyNowPlaying
+                from winsdk.windows.media.control import \
+                    GlobalSystemMediaTransportControlsSessionManager as GSMTC
                 import asyncio
 
                 async def _get_media():
-                    apps = await PyNowPlaying.get_active_app_user_model_ids()
-                    if not apps:
+                    sessions = await GSMTC.request_async()
+                    session = sessions.get_current_session()
+                    if not session:
                         return '', '', False
-                    pnp = await PyNowPlaying.create(aumid=apps[0]['AppID'])
-                    media = await pnp.get_media_info()
-                    playback = await pnp.get_playback_info()
-                    return media.title or '', media.artist or '', playback.playback_status == 3
+                    props = await session.try_get_media_properties_async()
+                    playback = session.get_playback_info()
+                    title = props.title if props and hasattr(props, 'title') else ''
+                    artist = props.artist if props and hasattr(props, 'artist') else ''
+                    playing = playback.playback_status.value == 4
+                    return title, artist, playing
 
                 loop = asyncio.new_event_loop()
                 try:

@@ -20,7 +20,6 @@ a = Analysis(
         'flet.controls',
         'flet.core',
         'flet.connection',
-        'py_now_playing',
         'winsdk',
         'asyncio',
     ],
