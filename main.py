@@ -1250,6 +1250,36 @@ def music_status():
 
         elif system == "Windows":
             try:
+                from py_now_playing import PyNowPlaying
+                import asyncio
+
+                async def _get_media():
+                    apps = await PyNowPlaying.get_active_app_user_model_ids()
+                    if not apps:
+                        return '', '', False
+                    pnp = await PyNowPlaying.create(aumid=apps[0]['AppID'])
+                    media = await pnp.get_media_info()
+                    playback = await pnp.get_playback_info()
+                    return media.title or '', media.artist or '', playback.playback_status == 3
+
+                loop = asyncio.new_event_loop()
+                try:
+                    title, artist, playing = loop.run_until_complete(_get_media())
+                finally:
+                    loop.close()
+
+                return jsonify({
+                    "status": "ok",
+                    "title": title,
+                    "artist": artist,
+                    "playing": playing,
+                    "cover_hash": None
+                })
+            except Exception:
+                pass
+
+            # Fallback: PowerShell SMTC
+            try:
                 import sys
                 si = None
                 if sys.platform == 'win32':
