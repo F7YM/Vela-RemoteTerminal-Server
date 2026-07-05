@@ -1165,9 +1165,39 @@ def music_status():
 
         elif system == "Windows":
             try:
-                import ctypes
-                return jsonify({"status": "ok", "title": "", "artist": "", "playing": False, "cover_hash": None})
-            except:
+                result = subprocess.run(['powershell', '-NoProfile', '-Command', '''
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+$taskGen = ([System.WindowsRuntimeSystemExtensions].GetMethods() | ? { $_.Name -eq "AsTask" -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq "IAsyncOperation`1" })[0]
+function WaitAsync($op, $t) {
+    $task = $taskGen.MakeGenericMethod($t).Invoke($null, @($op))
+    $task.Wait(2000) | Out-Null
+    if ($task.IsFaulted) { return $null }
+    return $task.Result
+}
+[Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime] | Out-Null
+$mgr = WaitAsync ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
+if ($mgr) {
+    $s = $mgr.GetCurrentSession()
+    if ($s) {
+        $pi = $s.GetPlaybackInfo()
+        $props = WaitAsync ($s.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])
+        if ($props) {
+            Write-Output "$($props.Title)|||$($props.Artist)|||$($pi.PlaybackStatus)"
+        }
+    }
+}
+'''], capture_output=True, text=True, timeout=8)
+                if result.returncode == 0 and result.stdout.strip():
+                    parts = result.stdout.strip().split('|||')
+                    status_str = parts[2] if len(parts) > 2 else ''
+                    return jsonify({
+                        "status": "ok",
+                        "title": parts[0] if len(parts) > 0 else "",
+                        "artist": parts[1] if len(parts) > 1 else "",
+                        "playing": status_str == 'Playing',
+                        "cover_hash": None
+                    })
+            except (FileNotFoundError, subprocess.TimeoutExpired):
                 pass
 
         return jsonify({"status": "ok", "title": "", "artist": "", "playing": False, "cover_hash": None})
