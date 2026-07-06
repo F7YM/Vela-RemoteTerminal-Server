@@ -1,37 +1,32 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_all
 
-# 自动收集 flet 所有数据
-datas = collect_data_files('flet', include_py_files=True)
-binaries = collect_dynamic_libs('flet')
+# 收集 flet 所有资源
+flet_datas, flet_binaries, flet_imports = collect_all('flet')
+datas = flet_datas
+binaries = flet_binaries
+hiddenimports = flet_imports
 
-# 收集 flet_desktop（桌面客户端，避免运行时下载）
-try:
-    fld_datas, fld_binaries, fld_imports = collect_all('flet_desktop')
-    datas += fld_datas
-    binaries += fld_binaries
-except ImportError:
-    fld_imports = []
+if sys.platform == 'win32':
+    datas += [('data/flet-windows.zip', 'flet_desktop/app')]
+
+hiddenimports += [
+    'paramiko',
+    'cryptography',
+    'bcrypt',
+    'pynacl',
+    'invoke',
+    'winsdk',
+    'asyncio',
+]
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=binaries,
     datas=datas,
-    hiddenimports=[
-        'paramiko',
-        'cryptography',
-        'bcrypt',
-        'pynacl',
-        'invoke',
-        'flet',
-        'flet.controls',
-        'flet.core',
-        'flet.connection',
-        'flet_desktop',
-        'winsdk',
-        'asyncio',
-    ] + fld_imports,
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

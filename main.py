@@ -2597,4 +2597,12 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
+    import flet_desktop.version
+    from flet_desktop import get_artifact_filename
+
+    ver = flet_desktop.version.version
+    artifact = get_artifact_filename()
+    os.environ["FLET_CLIENT_URL"] = (
+        f"https://gh-proxy.org/https://github.com/flet-dev/flet/releases/download/v{ver}/{artifact}"
+    )
     ft.run(main)
