@@ -12,3 +12,4 @@ data/pending_pair.json
 *.rpm
 *.tar.gz
 rpm/
+.vscode/
