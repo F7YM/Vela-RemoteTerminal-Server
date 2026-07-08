@@ -16,11 +16,12 @@ hiddenimports += [
     'paramiko',
     'cryptography',
     'bcrypt',
-    'pynacl',
+    'nacl',
     'invoke',
-    'winsdk',
     'asyncio',
 ]
+if sys.platform == 'win32':
+    hiddenimports.append('winsdk')
 
 a = Analysis(
     ['main.py'],
@@ -57,5 +58,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['app.ico'],
+    icon='app.ico' if sys.platform == 'win32' else ('RemoteTerminal.icns' if sys.platform == 'darwin' else None),
 )

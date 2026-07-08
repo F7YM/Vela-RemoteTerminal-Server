@@ -48,48 +48,80 @@ SERVER_LOG = []
 # ============ 依赖检查 ============
 
 def check_dependencies():
-    """检查系统依赖（Linux）"""
-    if platform.system() != "Linux":
-        return [], []
-
+    """检查系统依赖（跨平台）"""
+    system = platform.system()
     missing_tools = []
-    tools = {
-        'xdotool': {'check': ['which', 'xdotool'], 'dnf': 'xdotool', 'apt': 'xdotool', 'desc': '鼠标键盘控制'},
-        'playerctl': {'check': ['which', 'playerctl'], 'dnf': 'playerctl', 'apt': 'playerctl', 'desc': '音乐控制'},
-    }
 
-    desktop = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()
-    is_wayland = os.environ.get('WAYLAND_DISPLAY') is not None
+    if system == "Linux":
+        tools = {
+            'xdotool': {'check': ['which', 'xdotool'], 'dnf': 'xdotool', 'apt': 'xdotool', 'desc': '鼠标键盘控制'},
+            'playerctl': {'check': ['which', 'playerctl'], 'dnf': 'playerctl', 'apt': 'playerctl', 'desc': '音乐控制'},
+        }
 
-    if is_wayland:
-        tools['grim'] = {'check': ['which', 'grim'], 'dnf': 'grim', 'apt': 'grim', 'desc': 'Wayland截图'}
-    elif 'gnome' in desktop:
-        tools['gnome-screenshot'] = {'check': ['which', 'gnome-screenshot'], 'dnf': 'gnome-screenshot', 'apt': 'gnome-screenshot', 'desc': '屏幕截图'}
-    else:
-        tools['scrot'] = {'check': ['which', 'scrot'], 'dnf': 'scrot', 'apt': 'scrot', 'desc': '屏幕截图'}
+        desktop = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()
+        is_wayland = os.environ.get('WAYLAND_DISPLAY') is not None
 
-    for name, info in tools.items():
+        if is_wayland:
+            tools['grim'] = {'check': ['which', 'grim'], 'dnf': 'grim', 'apt': 'grim', 'desc': 'Wayland截图'}
+        elif 'gnome' in desktop:
+            tools['gnome-screenshot'] = {'check': ['which', 'gnome-screenshot'], 'dnf': 'gnome-screenshot', 'apt': 'gnome-screenshot', 'desc': '屏幕截图'}
+        else:
+            tools['scrot'] = {'check': ['which', 'scrot'], 'dnf': 'scrot', 'apt': 'scrot', 'desc': '屏幕截图'}
+
+        for name, info in tools.items():
+            try:
+                subprocess.run(info['check'], check=True, capture_output=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                missing_tools.append(info)
+
+        missing_pkgs = []
         try:
-            subprocess.run(info['check'], check=True, capture_output=True)
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            missing_tools.append(info)
+            import psutil
+        except ImportError:
+            missing_pkgs.append({'desc': '性能监控 (psutil)', 'dnf': 'python3-psutil', 'apt': 'python3-psutil'})
+        try:
+            from PIL import Image
+        except ImportError:
+            missing_pkgs.append({'desc': '截图处理 (Pillow)', 'dnf': 'python3-pillow', 'apt': 'python3-pillow'})
+        return missing_tools, missing_pkgs
 
-    missing_pkgs = []
-    try:
-        import psutil
-    except ImportError:
-        missing_pkgs.append({'desc': '性能监控 (psutil)', 'dnf': 'python3-psutil', 'apt': 'python3-psutil'})
+    elif system == "Darwin":
+        tools = {
+            'cliclick': {'check': ['which', 'cliclick'], 'install': 'brew install cliclick', 'desc': '鼠标键盘控制 (cliclick)'},
+        }
+        for name, info in tools.items():
+            try:
+                subprocess.run(info['check'], check=True, capture_output=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                missing_tools.append(info)
 
-    try:
-        from PIL import Image
-    except ImportError:
-        missing_pkgs.append({'desc': '截图处理 (Pillow)', 'dnf': 'python3-pillow', 'apt': 'python3-pillow'})
+        missing_pkgs = []
+        try:
+            import psutil
+        except ImportError:
+            missing_pkgs.append({'desc': '性能监控 (psutil)', 'install': 'pip3 install psutil'})
+        try:
+            from PIL import Image
+        except ImportError:
+            missing_pkgs.append({'desc': '截图处理 (Pillow)', 'install': 'pip3 install Pillow'})
+        return missing_tools, missing_pkgs
 
-    return missing_tools, missing_pkgs
+    return [], []
 
 
 def get_install_cmd(missing_tools, missing_pkgs):
     """生成安装命令"""
+    system = platform.system()
+
+    if system == "Darwin":
+        pkgs = []
+        for t in missing_tools:
+            pkgs.append(t.get('install', ''))
+        for p in missing_pkgs:
+            pkgs.append(p.get('install', ''))
+        pkgs = [p for p in pkgs if p]
+        return '\n'.join(pkgs) if pkgs else ""
+
     is_rpm = os.path.exists('/etc/fedora-release') or os.path.exists('/etc/redhat-release')
     pkg_key = 'dnf' if is_rpm else 'apt'
 
@@ -115,9 +147,11 @@ def show_dependency_dialog(missing_tools, missing_pkgs, page):
 
     items = []
     for t in missing_tools:
-        items.append(ft.Text(f"• {t['desc']} ({t.get('dnf', t.get('apt', ''))})", size=13))
+        pkg_info = t.get('install', t.get('dnf', t.get('apt', '')))
+        items.append(ft.Text(f"• {t['desc']} ({pkg_info})", size=13))
     for p in missing_pkgs:
-        items.append(ft.Text(f"• {p['desc']} ({p.get('dnf', p.get('apt', ''))})", size=13))
+        pkg_info = p.get('install', p.get('dnf', p.get('apt', '')))
+        items.append(ft.Text(f"• {p['desc']} ({pkg_info})", size=13))
 
     content_col = [
         ft.Text("以下依赖缺失，部分功能不可用:", size=14, weight=ft.FontWeight.BOLD),
@@ -1688,6 +1722,8 @@ def ssh_connect():
             shell_cmd = ssh_shell
         elif platform.system() == 'Windows':
             shell_cmd = 'powershell.exe -NoLogo'
+        elif platform.system() == 'Darwin':
+            shell_cmd = '/bin/zsh -i'
         else:
             shell_cmd = '/bin/bash -i'
         channel.exec_command(shell_cmd)
@@ -2614,8 +2650,8 @@ def main(page: ft.Page):
     add_log("远程终端服务端已就绪", "info")
     refresh_log_list()
 
-    # 依赖检查（Linux）
-    if platform.system() == "Linux":
+    # 依赖检查
+    if platform.system() in ("Linux", "Darwin"):
         missing_tools, missing_pkgs = check_dependencies()
         if missing_tools or missing_pkgs:
             show_dependency_dialog(missing_tools, missing_pkgs, page)
