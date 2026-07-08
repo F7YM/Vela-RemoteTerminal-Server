@@ -4,9 +4,7 @@ __pycache__/
 dist/
 build/
 *.spec
-data/static/
-data/config.json
-data/pending_pair.json
+data/
 *.AppImage
 *.zip
 *.rpm
