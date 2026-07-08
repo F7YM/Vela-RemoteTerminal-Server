@@ -2083,24 +2083,20 @@ def main(page: ft.Page):
 
     page.window.on_event = on_window_event
 
-    # 获取本机内网IP（UDP connect 法，零依赖，跨平台）
+    # 获取本机IP（优先192.168.x.x）
     local_ip = "未知"
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 80))
-        local_ip = s.getsockname()[0]
-        s.close()
+        _hostname, _aliases, ips = socket.gethostbyname_ex(socket.gethostname())
+        candidates = [ip for ip in ips if not ip.startswith('127.')]
+        # 优先192.168.x.x
+        for ip in candidates:
+            if ip.startswith('192.168.'):
+                local_ip = ip
+                break
+        if local_ip == "未知" and candidates:
+            local_ip = candidates[0]
     except OSError:
         pass
-    if local_ip == "未知":
-        try:
-            _hostname, _aliases, ips = socket.gethostbyname_ex(socket.gethostname())
-            for ip in ips:
-                if not ip.startswith('127.'):
-                    local_ip = ip
-                    break
-        except OSError:
-            pass
 
     # 状态指示灯
     status_indicator = ft.Container(
