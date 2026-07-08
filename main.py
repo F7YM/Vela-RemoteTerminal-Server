@@ -34,7 +34,7 @@ CORS(flask_app)
 
 # 常量
 API_LEVEL = 5
-VERSION = "1.4.1"
+VERSION = "1.4.2"
 
 # 存储路径
 TRUSTED_DEVICES_FILE = "trusted_devices.json"
