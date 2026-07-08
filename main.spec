@@ -12,6 +12,7 @@ if sys.platform == 'win32':
     datas += [('data/flet-windows.zip', 'flet_desktop/app')]
 
 hiddenimports += [
+    'netifaces',
     'paramiko',
     'cryptography',
     'bcrypt',

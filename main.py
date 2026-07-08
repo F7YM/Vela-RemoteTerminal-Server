@@ -12,6 +12,7 @@ import os
 import sys
 import platform
 import socket
+import netifaces
 import time
 import uuid
 import binascii
@@ -2083,18 +2084,15 @@ def main(page: ft.Page):
 
     page.window.on_event = on_window_event
 
-    # 获取本机IP（优先192.168.x.x）
-    local_ip = "未知"
+    # 获取本机所有内网 IPv4 地址
+    local_ips = []
     try:
-        _hostname, _aliases, ips = socket.gethostbyname_ex(socket.gethostname())
-        candidates = [ip for ip in ips if not ip.startswith('127.')]
-        # 优先192.168.x.x
-        for ip in candidates:
-            if ip.startswith('192.168.'):
-                local_ip = ip
-                break
-        if local_ip == "未知" and candidates:
-            local_ip = candidates[0]
+        for iface in netifaces.interfaces():
+            addrs = netifaces.ifaddresses(iface).get(netifaces.AF_INET, [])
+            for addr in addrs:
+                ip = addr['addr']
+                if not ip.startswith('127.'):
+                    local_ips.append(ip)
     except OSError:
         pass
 
@@ -2105,14 +2103,38 @@ def main(page: ft.Page):
     )
     status_text = ft.Text("服务未启动", size=14)
 
-    # IP 显示
+    # IP 列表显示
+    ip_rows = []
+    for ip in local_ips:
+        ip_rows.append(
+            ft.Row([
+                ft.Text(ip, size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_300),
+                ft.IconButton(
+                    icon=ft.Icons.COPY, icon_size=16, tooltip="复制IP",
+                    on_click=lambda _, ip=ip: copy_to_clipboard(ip))
+            ])
+        )
+    def show_ip_help(e):
+        dlg = ft.AlertDialog(
+            title=ft.Text("连接帮助"),
+            content=ft.Column([
+                ft.Text("请优先尝试 192.168 开头的 IP。"),
+                ft.Text("若无法连接，请确保电脑和手表在同一局域网下，或尝试其他 IP。"),
+                ft.Text("如果遇到问题，欢迎进入 QQ 群讨论：1053432339"),
+            ], tight=True),
+            actions=[ft.TextButton("知道了", on_click=lambda _: setattr(dlg, 'open', False) or page.update())],
+        )
+        page.overlay.append(dlg)
+        dlg.open = True
+        page.update()
+
     ip_display = ft.Container(
-        content=ft.Row([
-            ft.Text("本机IP:", size=14, color=ft.Colors.GREY_400),
-            ft.Text(local_ip, size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_300),
-            ft.IconButton(
-                icon=ft.Icons.COPY, icon_size=16, tooltip="复制IP",
-                on_click=lambda _: copy_to_clipboard(local_ip))
+        content=ft.Column([
+            ft.Row([
+                ft.Text("本机IP", size=14, color=ft.Colors.GREY_400),
+                ft.IconButton(icon=ft.Icons.HELP_OUTLINE, icon_size=14, tooltip="连接帮助", on_click=show_ip_help),
+            ]),
+            *ip_rows,
         ]),
         bgcolor=ft.Colors.BLACK26,
         padding=ft.Padding.symmetric(horizontal=15, vertical=10),
@@ -2219,6 +2241,28 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(
             padding=ft.Padding.symmetric(horizontal=30, vertical=15)
         )
+    )
+
+    refresh_btn = ft.IconButton(
+        icon=ft.Icons.REFRESH, tooltip="刷新设备列表",
+        on_click=lambda _: refresh_devices()
+    )
+
+    # 连接标签页
+    connect_tab_content = ft.Container(
+        content=ft.Column([
+            ip_display,
+            ft.Container(
+                content=ft.Row([
+                    port_field,
+                    start_btn,
+                    refresh_btn,
+                ], alignment=ft.MainAxisAlignment.START),
+                padding=ft.Padding.only(top=10)
+            ),
+        ]),
+        padding=10,
+        expand=True
     )
 
     # 日志标签页
@@ -2463,9 +2507,36 @@ def main(page: ft.Page):
         scale=0.8
     )
 
+    # 关于区域
+    about_section = ft.Container(
+        content=ft.Column([
+            ft.Row([
+                ft.Image(src="RemoteTerminal.png", width=36, height=36),
+                ft.Text(f"远程终端 v{VERSION}  API Level {API_LEVEL}", size=14, weight=ft.FontWeight.BOLD),
+            ]),
+            ft.Text("By Float11", size=12, color=ft.Colors.GREY_400),
+            ft.Row([
+                ft.Text("QQ群：1053432339", size=12, color=ft.Colors.GREY_400),
+            ]),
+            ft.Divider(height=1, color=ft.Colors.GREY_800),
+            ft.Text("如果喜欢远程终端，可以前往 爱发电 支持一下作者哦！万分感谢！",
+                    size=12, color=ft.Colors.GREY_400),
+            ft.TextButton(
+                "前往爱发电",
+                icon=ft.Icons.FAVORITE,
+                url="https://ifdian.net/a/float11",
+            ),
+        ], spacing=6),
+        bgcolor=ft.Colors.BLACK12,
+        padding=12,
+        border_radius=8,
+    )
+
     # 设置标签页
     settings_tab_content = ft.Container(
         content=ft.Column([
+            about_section,
+            ft.Divider(height=1, color=ft.Colors.GREY_800),
             ft.Text("开机自启", size=14),
             ft.Text("系统启动时自动运行远程终端", size=11, color=ft.Colors.GREY_400),
             ft.Row([ft.Container(expand=True), autostart_switch]),
@@ -2485,7 +2556,7 @@ def main(page: ft.Page):
 
     # 标签页
     tabs = ft.Tabs(
-        length=4,
+        length=5,
         selected_index=0,
         animation_duration=300,
         expand=True,
@@ -2494,6 +2565,7 @@ def main(page: ft.Page):
             controls=[
                 ft.TabBar(
                     tabs=[
+                        ft.Tab(label="连接", icon=ft.Icons.WIFI),
                         ft.Tab(label="日志", icon=ft.Icons.LIST_ALT),
                         ft.Tab(label="信任设备", icon=ft.Icons.WATCH),
                         ft.Tab(label="命令", icon=ft.Icons.TERMINAL),
@@ -2502,7 +2574,13 @@ def main(page: ft.Page):
                 ),
                 ft.TabBarView(
                     expand=True,
-                    controls=[log_tab_content, devices_tab_content, commands_tab_content, settings_tab_content]
+                    controls=[
+                        connect_tab_content,
+                        log_tab_content,
+                        devices_tab_content,
+                        commands_tab_content,
+                        settings_tab_content
+                    ]
                 ),
             ]
         ),
@@ -2519,20 +2597,7 @@ def main(page: ft.Page):
                 ]),
                 padding=ft.Padding.only(bottom=15)
             ),
-            ip_display,
-            ft.Container(
-                content=ft.Row([
-                    port_field,
-                    start_btn,
-                    ft.IconButton(
-                        icon=ft.Icons.REFRESH, tooltip="刷新设备列表",
-                        on_click=lambda _: refresh_devices()
-                    )
-                ], alignment=ft.MainAxisAlignment.START),
-                padding=ft.Padding.only(top=5)
-            ),
-            ft.Container(content=tabs, expand=True, padding=ft.Padding.only(top=10)),
-            # 版本信息
+            ft.Container(content=tabs, expand=True),
             ft.Container(
                 content=ft.Row([
                     ft.Container(expand=True),
