@@ -916,10 +916,10 @@ def screen_click():
         system = platform.system()
         
         if system == "Windows":
-            import ctypes
-            ctypes.windll.user32.SetCursorPos(x, y)
-            ctypes.windll.user32.mouse_event(2, 0, 0, 0, 0)
-            ctypes.windll.user32.mouse_event(4, 0, 0, 0, 0)
+            import pyautogui
+            pyautogui.FAILSAFE = False
+            pyautogui.PAUSE = 0
+            pyautogui.click(x, y)
         elif system == "Linux":
             try:
                 subprocess.run(['xdotool', 'mousemove', '--screen', '0', str(x), str(y)], 
@@ -981,16 +981,10 @@ def keyboard_input():
         system = platform.system()
 
         if system == "Windows":
-            import ctypes
-            # Windows虚拟键码
-            vk_map = {
-                'left': 0x25, 'right': 0x27, 'up': 0x26, 'down': 0x28,
-                'enter': 0x0D, 'space': 0x20
-            }
-            vk = vk_map.get(key, 0)
-            if vk:
-                ctypes.windll.user32.keybd_event(vk, 0, 0, 0)
-                ctypes.windll.user32.keybd_event(vk, 0, 2, 0)
+            import pyautogui
+            pyautogui.FAILSAFE = False
+            pyautogui.PAUSE = 0
+            pyautogui.press(key)
         elif system == "Linux":
             # 检测xdotool是否可用
             try:
@@ -1022,11 +1016,11 @@ def _get_cursor_position():
     system = platform.system()
     try:
         if system == "Windows":
-            import ctypes
-            from ctypes import wintypes
-            pt = wintypes.POINT()
-            ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
-            return pt.x, pt.y
+            import pyautogui
+            pyautogui.FAILSAFE = False
+            pyautogui.PAUSE = 0
+            x, y = pyautogui.position()
+            return x, y
         elif system == "Linux":
             result = subprocess.run(['xdotool', 'getmouselocation', '--shell'],
                                    capture_output=True, text=True, timeout=2)
@@ -1074,8 +1068,10 @@ def touchpad_move():
         system = platform.system()
 
         if system == "Windows":
-            import ctypes
-            ctypes.windll.user32.mouse_event(1, dx, dy, 0, 0)  # MOUSEEVENTF_MOVE = 1
+            import pyautogui
+            pyautogui.FAILSAFE = False
+            pyautogui.PAUSE = 0
+            pyautogui.move(dx, dy)
         elif system == "Linux":
             try:
                 subprocess.run(['xdotool', 'mousemove_relative', '--', str(dx), str(dy)],
@@ -1115,13 +1111,11 @@ def touchpad_click():
         system = platform.system()
 
         if system == "Windows":
-            import ctypes
-            if button == 'left':
-                ctypes.windll.user32.mouse_event(2, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTDOWN
-                ctypes.windll.user32.mouse_event(4, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTUP
-            elif button == 'right':
-                ctypes.windll.user32.mouse_event(8, 0, 0, 0, 0)  # MOUSEEVENTF_RIGHTDOWN
-                ctypes.windll.user32.mouse_event(16, 0, 0, 0, 0)  # MOUSEEVENTF_RIGHTUP
+            import pyautogui
+            pyautogui.FAILSAFE = False
+            pyautogui.PAUSE = 0
+            btn = 'left' if button == 'left' else 'right'
+            pyautogui.click(button=btn)
         elif system == "Linux":
             btn_map = {'left': '1', 'middle': '2', 'right': '3'}
             btn = btn_map.get(button, '1')
@@ -1165,10 +1159,10 @@ def touchpad_scroll():
         system = platform.system()
 
         if system == "Windows":
-            import ctypes
-            # MOUSEEVENTF_WHEEL = 0x0800, WHEEL_DELTA = 120
-            amount = int(dy * 120 / 10)
-            ctypes.windll.user32.mouse_event(0x0800, 0, 0, amount, 0)
+            import pyautogui
+            pyautogui.FAILSAFE = False
+            pyautogui.PAUSE = 0
+            pyautogui.scroll(dy // 10)
         elif system == "Linux":
             # xdotool 滚动: 正数向下，负数向上
             btn = '5' if dy > 0 else '4'
@@ -1215,8 +1209,10 @@ def touchpad_move_to():
         y = max(0, min(y, 10000))
         system = platform.system()
         if system == "Windows":
-            import ctypes
-            ctypes.windll.user32.SetCursorPos(x, y)
+            import pyautogui
+            pyautogui.FAILSAFE = False
+            pyautogui.PAUSE = 0
+            pyautogui.moveTo(x, y)
         elif system == "Linux":
             try:
                 subprocess.run(['xdotool', 'mousemove', str(x), str(y)],

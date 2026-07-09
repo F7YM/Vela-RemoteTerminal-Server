@@ -19,6 +19,7 @@ hiddenimports += [
     'nacl',
     'invoke',
     'asyncio',
+    'pyautogui',
 ]
 if sys.platform == 'win32':
     hiddenimports.append('winsdk')
