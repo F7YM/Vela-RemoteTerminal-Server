@@ -34,8 +34,8 @@ flask_app = Flask(__name__)
 CORS(flask_app)
 
 # 常量
-API_LEVEL = 5
-VERSION = "1.4.2"
+API_LEVEL = 6
+VERSION = "1.5.0"
 
 # 存储路径
 TRUSTED_DEVICES_FILE = "trusted_devices.json"
@@ -1869,6 +1869,89 @@ def ssh_disconnect():
     return jsonify({"status": "ok", "message": "SSH 已断开"})
 
 
+# ============ hydroApp 远程UI ============
+
+_active_app = None
+
+from hydroApp.loader import list_apps, load_module, install as _install_app, uninstall as _uninstall_app
+
+
+@flask_app.route('/api/hydro/page', methods=['GET'])
+def hydro_page():
+    shape = request.args.get('shape', 'circle')
+    sw = int(request.args.get('sw', '466'))
+    sh = int(request.args.get('sh', '466'))
+    mod = _get_active_mod()
+    if not mod or not hasattr(mod, 'page'):
+        return jsonify({"ri": 0, "c": []})
+    try:
+        result = mod.page(shape, sw, sh)
+        if hasattr(result, 'to_dict'):
+            return jsonify(result.to_dict())
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"ri": 0, "c": [{"t": "text", "v": f"Error: {e}", "s": "color: #ff4444"}]})
+
+
+@flask_app.route('/api/hydro/action', methods=['POST'])
+@require_trusted
+def hydro_action():
+    data = request.get_json(silent=True) or {}
+    action_id = data.get('action', '')
+    params = data.get('params', {})
+    mod = _get_active_mod()
+    if not mod or not hasattr(mod, 'handle'):
+        return jsonify({"toast": "无活跃的 HydroApp"})
+    try:
+        result = mod.handle(action_id, params)
+        if hasattr(result, 'to_dict'):
+            return jsonify(result.to_dict())
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"toast": str(e)})
+
+
+def _get_active_mod():
+    global _active_app
+    if not _active_app:
+        return None
+    return load_module(_active_app)
+
+
+def _activate_app(name):
+    global _active_app
+    _active_app = name
+
+
+def _deactivate_app():
+    global _active_app
+    _active_app = None
+
+
+@flask_app.route('/api/hydro/list', methods=['GET'])
+@require_trusted
+def hydro_list():
+    apps = list_apps()
+    return jsonify({"apps": [{"name": a["name"], "displayName": a.get("displayName", a["name"])} for a in apps]})
+
+
+@flask_app.route('/api/hydro/activate', methods=['POST'])
+@require_trusted
+def hydro_activate_api():
+    data = request.get_json(silent=True) or {}
+    name = data.get('name', '')
+    if not name:
+        return jsonify({"status": "error", "message": "缺少应用名称"}), 400
+    try:
+        mod = load_module(name)
+        if not mod or not hasattr(mod, 'page') or not hasattr(mod, 'handle'):
+            return jsonify({"status": "error", "message": f"应用 {name} 无效"}), 400
+        _activate_app(name)
+        return jsonify({"status": "ok", "message": f"已激活 {name}"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 # ============ 系统信息函数 ============
 
 def get_system_info():
@@ -2586,9 +2669,83 @@ def main(page: ft.Page):
         expand=True
     )
 
+    # hydroApp 页
+    hydro_app_list = ft.Column([], spacing=4, scroll=ft.ScrollMode.AUTO)
+    hydro_status = ft.Text("无已安装的 HydroApp", size=14, color=ft.Colors.GREY_500)
+
+    def hydro_refresh_list(e=None):
+        apps = list_apps()
+        hydro_app_list.controls.clear()
+        if not apps:
+            hydro_status.value = "无已安装的 HydroApp"
+            hydro_status.color = ft.Colors.GREY_500
+        else:
+            hydro_status.value = f"已安装 {len(apps)} 个"
+            hydro_status.color = ft.Colors.GREEN_400
+            for app in apps:
+                name = app["name"]
+                dn = app.get("displayName", name)
+                pid = app.get("id", "")
+                row = ft.Row([
+                    ft.Icon(ft.Icons.FOLDER_OPEN, color=ft.Colors.BLUE_300, size=18),
+                    ft.Column([
+                        ft.Text(dn, size=14, color=ft.Colors.WHITE),
+                        ft.Text(pid, size=10, color=ft.Colors.GREY_500),
+                    ], spacing=1),
+                    ft.Container(expand=True),
+                    ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_size=18, icon_color=ft.Colors.RED_400,
+                                  on_click=lambda _, n=name: hydro_uninstall(n)),
+                ])
+                hydro_app_list.controls.append(row)
+            hydro_status.update()
+            hydro_app_list.update()
+
+    def hydro_uninstall(name):
+        _uninstall_app(name)
+        hydro_refresh_list(None)
+        s = ft.SnackBar(ft.Text(f"已卸载: {name}"))
+        page.overlay.append(s)
+        s.open = True
+
+    import tkinter as tk
+    from tkinter import filedialog
+
+    def hydro_do_install(e):
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        path = filedialog.askopenfilename(
+            title='选择 HydroApp 压缩包',
+            filetypes=[('ZIP 压缩包', '*.zip'), ('所有文件', '*.*')]
+        )
+        root.destroy()
+        if not path:
+            return
+        name = _install_app(path)
+        if name:
+            hydro_refresh_list(None)
+            s = ft.SnackBar(ft.Text(f"已安装: {name}"))
+            page.overlay.append(s)
+            s.open = True
+        else:
+            s = ft.SnackBar(ft.Text("安装失败，压缩包格式不正确"))
+            page.overlay.append(s)
+            s.open = True
+
+    hydro_tab_content = ft.Container(
+        content=ft.Column([
+            ft.Row([ft.Text("HydroApp", size=16, weight=ft.FontWeight.BOLD)]),
+            ft.Divider(height=1, color=ft.Colors.GREY_800),
+            ft.Row([ft.Text("已安装:", size=14, weight=ft.FontWeight.BOLD), hydro_status]),
+            hydro_app_list,
+            ft.Button("安装", icon=ft.Icons.UPLOAD_FILE, on_click=hydro_do_install),
+        ], spacing=8, scroll=ft.ScrollMode.AUTO),
+        padding=10, expand=True,
+    )
+
     # 标签页
     tabs = ft.Tabs(
-        length=5,
+        length=6,
         selected_index=0,
         animation_duration=300,
         expand=True,
@@ -2601,6 +2758,7 @@ def main(page: ft.Page):
                         ft.Tab(label="日志", icon=ft.Icons.LIST_ALT),
                         ft.Tab(label="信任设备", icon=ft.Icons.WATCH),
                         ft.Tab(label="命令", icon=ft.Icons.TERMINAL),
+                        ft.Tab(label="Hydro", icon=ft.Icons.APPS),
                         ft.Tab(label="设置", icon=ft.Icons.SETTINGS),
                     ]
                 ),
@@ -2611,6 +2769,7 @@ def main(page: ft.Page):
                         log_tab_content,
                         devices_tab_content,
                         commands_tab_content,
+                        hydro_tab_content,
                         settings_tab_content
                     ]
                 ),
@@ -2643,6 +2802,7 @@ def main(page: ft.Page):
     # 初始化
     refresh_devices()
     refresh_commands()
+    hydro_refresh_list(None)
     add_log("远程终端服务端已就绪", "info")
     refresh_log_list()
 

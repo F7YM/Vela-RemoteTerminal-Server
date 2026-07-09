@@ -1,0 +1,11 @@
+{
+  "manifestVersion": 1,
+  "package": {
+    "id": "com.remote.hydroremote",
+    "name": "HydroRemote",
+    "displayName": "远程控制",
+    "version": "1.0.0",
+    "versionCode": 1
+  },
+  "minAPILevel": 6
+}
