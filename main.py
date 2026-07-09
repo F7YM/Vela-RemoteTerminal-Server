@@ -1877,6 +1877,7 @@ from hydroApp.loader import list_apps, load_module, install as _install_app, uni
 
 
 @flask_app.route('/api/hydro/page', methods=['GET'])
+@require_trusted
 def hydro_page():
     shape = request.args.get('shape', 'circle')
     sw = int(request.args.get('sw', '466'))
