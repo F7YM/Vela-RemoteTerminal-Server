@@ -7,9 +7,38 @@ import tempfile
 import shutil
 
 APPS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'hydroApps')
+# 客户端最低 API 等级（与客户端 manifest.json 的 minAPILevel 保持一致）
+CLIENT_MIN_API_LEVEL = 2
 
 
 def _read_manifest(app_dir: str) -> dict:
+    mp = os.path.join(app_dir, 'manifest.json')
+    if os.path.isfile(mp):
+        try:
+            with open(mp, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def validate_manifest(manifest: dict) -> tuple:
+    """校验 manifest，返回 (是否合法, 错误信息)"""
+    if not manifest:
+        return False, "缺少 manifest.json"
+    pkg = manifest.get("package", {})
+    if not pkg.get("id"):
+        return False, "manifest.json 缺少 package.id"
+    min_api = manifest.get("minAPILevel")
+    if min_api is None:
+        return False, "manifest.json 缺少 minAPILevel"
+    try:
+        min_api = int(min_api)
+    except (ValueError, TypeError):
+        return False, f"minAPILevel 无效: {min_api}"
+    if min_api < CLIENT_MIN_API_LEVEL:
+        return False, f"minAPILevel ({min_api}) 低于客户端最低要求 ({CLIENT_MIN_API_LEVEL})"
+    return True, ""
     mp = os.path.join(app_dir, 'manifest.json')
     if os.path.isfile(mp):
         try:
@@ -82,6 +111,11 @@ def install(zip_path: str) -> str | None:
             return None
         # 读取 manifest.json 中的 package.name 作为目录名
         manifest = _read_manifest(app_dir)
+        valid, err = validate_manifest(manifest)
+        if not valid:
+            shutil.rmtree(tmp)
+            print(f"[HydroApp] 安装失败: {err}", flush=True)
+            return None
         pkg = manifest.get("package", {})
         target_name = pkg.get("id") or os.path.basename(app_dir)
         target_path = os.path.join(APPS_DIR, target_name)
