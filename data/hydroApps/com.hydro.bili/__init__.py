@@ -1,7 +1,7 @@
 """HydroBili — Bilibili 扫码登录"""
 
 from .api import verify_cookies, fetch_recommend, fetch_user_card, fetch_video_info
-from .pages import landing_page, home_page, tabs_page, mine_page, video_detail
+from .pages import splash_page, landing_page, home_page, tabs_page, mine_page, video_detail
 from .login import do_generate, do_poll
 
 _cache = {
