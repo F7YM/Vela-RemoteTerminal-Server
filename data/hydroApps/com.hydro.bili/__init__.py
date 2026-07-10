@@ -9,6 +9,7 @@ _cache = {
     "mid": 0,
     "name": "",
     "qrcode_key": "",
+    "videos": [],
 }
 
 
@@ -23,11 +24,13 @@ def _restore(store: dict):
             _cache["name"] = name
 
 
-def _build_home(shape):
+def _build_home(shape, refresh=False):
     """获取推荐视频并构建首页"""
-    videos = fetch_recommend(_cache["cookies"]) if _cache["cookies"] else []
-    _cache["bids"] = [v.get("bvid", "") for v in videos]
-    return home_page(shape, videos, _cache["mid"], _cache["name"])
+    if refresh or not _cache.get("videos"):
+        videos = fetch_recommend(_cache["cookies"]) if _cache["cookies"] else []
+        _cache["videos"] = videos
+        _cache["bids"] = [v.get("bvid", "") for v in videos]
+    return home_page(shape, _cache["videos"], _cache["mid"], _cache["name"])
 
 
 def _build_mine(shape):
@@ -68,7 +71,7 @@ def handle(action, params, shape=None, sw=0, sh=0):
             if mid:
                 _cache["mid"] = mid
                 _cache["name"] = name
-                return _build_home(shape).to_dict()
+                return _build_home(shape, refresh=True).to_dict()
             _cache["cookies"] = {}
         return landing_page(shape).to_dict()
 
@@ -79,14 +82,14 @@ def handle(action, params, shape=None, sw=0, sh=0):
             if mid:
                 _cache["mid"] = mid
                 _cache["name"] = name
-                return _build_home(shape).to_dict()
+                return _build_home(shape, refresh=True).to_dict()
         return {"toast": "登录已失效"}
 
     # Tab 切换页
     elif action == "tabs":
         return tabs_page(shape).to_dict()
 
-    # 首页
+    # 首页（从详情页返回时命中此 action，使用缓存不刷新）
     elif action == "home":
         if _cache["cookies"]:
             return _build_home(shape).to_dict()
@@ -141,7 +144,7 @@ def handle(action, params, shape=None, sw=0, sh=0):
             _cache["mid"] = result.get("_mid") or 0
             _cache["name"] = result.get("_name") or ""
             _cache["qrcode_key"] = ""
-            r = _build_home(shape).to_dict()
+            r = _build_home(shape, refresh=True).to_dict()
             r["_store"] = store
             r["toast"] = "登录成功"
             return r
