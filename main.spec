@@ -5,8 +5,6 @@ from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, co
 # 收集 flet 所有资源
 flet_datas, flet_binaries, flet_imports = collect_all('flet')
 datas = flet_datas
-# 包含 hydroApp 应用代码
-datas += [('data/hydroApps', 'data/hydroApps')]
 binaries = flet_binaries
 hiddenimports = flet_imports
 

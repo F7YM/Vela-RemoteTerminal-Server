@@ -30,12 +30,22 @@ def landing_page(shape, logged_in=False, mid=0, name=""):
     )
 
 
+_IconData = {
+    "refresh": "ic_fluent_arrow_clockwise_24_filled.png",
+    "home": "ic_fluent_home_24_filled.png",
+    "person": "ic_fluent_person_24_filled.png",
+}
+
+def _icon(name: str) -> str:
+    return '/hydro-icons/com.hydro.bili/' + _IconData[name]
+
+
 def home_page(shape, videos, mid, name):
     """首页：标题 + 刷新按钮 + 推荐视频列表"""
     items = [
         Row(
             Button("首页", action="tabs", bg="transparent", h=48, fs=30, fw="bold", mr=20),
-            Button(action="refresh", image="/hydro-icons/ic_fluent_arrow_clockwise_24_filled.png", bg="transparent", h=48, w=48),
+            Button(action="refresh", image=_icon("refresh"), bg="transparent", h=48, w=48),
             props={"jc": "center", "ai": "center"},
         ),
     ]
@@ -67,14 +77,14 @@ def tabs_page(shape):
         Text("切换页面", fs=28, clr="#ffffff", fw="bold", mt=10),
         Row(
             Column(
-                Image(src="/hydro-icons/ic_fluent_home_24_filled.png", w=80, h=80),
+                Image(src=_icon("home"), w=80, h=80),
                 Text("首页", fs=22, clr="#ffffff", mt=8),
                 a="home",
                 props={"ai": "center"},
                 mr=50,
             ),
             Column(
-                Image(src="/hydro-icons/ic_fluent_person_24_filled.png", w=80, h=80),
+                Image(src=_icon("person"), w=80, h=80),
                 Text("我的", fs=22, clr="#ffffff", mt=8),
                 a="mine",
                 props={"ai": "center"},
