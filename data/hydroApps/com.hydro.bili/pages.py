@@ -33,26 +33,26 @@ def landing_page(shape, logged_in=False, mid=0, name=""):
 def home_page(shape, videos, mid, name):
     """首页：可点击标题 + 推荐视频列表"""
     items = [
-        Button("首页", action="tabs", bg="transparent", h=34, mt=6, fs=26, fw="bold"),
+        Button("首页", action="tabs", bg="transparent", h=40, mt=8, fs=30, fw="bold"),
     ]
     if not videos:
-        items.append(Text("加载推荐中...", fs=18, clr="#aaaaaa", mt=20))
+        items.append(Text("加载推荐中...", fs=22, clr="#aaaaaa", mt=20))
     else:
         for v in videos:
             title = v.get("title", "")
             owner = v.get("owner", {}).get("name", "未知")
             view = _format_num(v.get("stat", {}).get("view", 0))
-            items.append(Text(title, fs=18, clr="#ffffff", mt=12))
-            items.append(Text(f"{owner} · {view}播放", fs=14, clr="#888888", mt=3))
+            items.append(Text(title, fs=22, clr="#ffffff", mt=14))
+            items.append(Text(f"{owner} · {view}播放", fs=16, clr="#888888", mt=4))
     return Page(*items, content_style=safe_area_style(shape))
 
 
 def tabs_page(shape):
     """Tab 切换页"""
     return Page(
-        Text("切换页面", fs=24, clr="#ffffff", fw="bold", mt=10),
-        Button("  首页  ", action="home", bg="#2196F3", w=220, h=48, br=24, mt=20, fs=18),
-        Button("  我的  ", action="mine", bg="#555555", w=220, h=48, br=24, mt=14, fs=18),
+        Text("切换页面", fs=28, clr="#ffffff", fw="bold", mt=10),
+        Button("  首页  ", action="home", bg="#2196F3", w=220, h=48, br=24, mt=20, fs=22),
+        Button("  我的  ", action="mine", bg="#555555", w=220, h=48, br=24, mt=14, fs=22),
         content_style=safe_area_style(shape),
     )
 
@@ -60,17 +60,17 @@ def tabs_page(shape):
 def mine_page(shape, face, name):
     """我的页面：头像 + 昵称横向并列"""
     items = [
-        Button("我的", action="tabs", bg="transparent", h=34, mt=6, fs=26, fw="bold"),
+        Button("我的", action="tabs", bg="transparent", h=40, mt=8, fs=30, fw="bold"),
     ]
     if face:
         items.append(Row(
-            Image(src=face, w=48, h=48, br=24),
-            Text(name, fs=20, clr="#ffffff", ml=12),
+            Image(src=face, w=56, h=56, br=28),
+            Text(name, fs=24, clr="#ffffff", ml=14),
             props={"ai": "center", "jc": "flex-start"},
         ))
     else:
-        items.append(Text(name, fs=20, clr="#ffffff", mt=4))
-    items.append(Button("退出登录", action="logout", bg="#f44336", w=220, h=48, br=24, mt=24, fs=18))
+        items.append(Text(name, fs=24, clr="#ffffff", mt=4))
+    items.append(Button("退出登录", action="logout", bg="#f44336", w=220, h=48, br=24, mt=24, fs=22))
     return Page(*items, content_style=safe_area_style(shape))
 
 
