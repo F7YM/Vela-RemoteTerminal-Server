@@ -324,10 +324,10 @@ server/data/hydroApps/MyApp/
 
 | 字段 | 说明 |
 |---|---|
-| `package.id` | 唯一标识，建议用反向域名 |
-| `package.name` | **安装后的目录名**，也是 `activate` 时用的 name。变更即视为新应用 |
+| `package.id` | **安装后的目录名**，也是 `activate` 时用的 name。使用反向域名（如 `com.example.app`）确保唯一。变更即视为新应用 |
+| `package.name` | 内部名称，不直接用于路径 |
 | `package.displayName` | 启动器中显示的名称 |
-| `package.version` | 版本号（字符串） |
+| `package.version` | 版本号（字符串），如 `"1.0.0"` |
 | `package.versionCode` | 版本号（整数），用于比较新旧 |
 | `minAPILevel` | 最低 API 等级，当前为 6 |
 
@@ -376,17 +376,18 @@ zip -r MyApp.zip MyApp/
 
 ZIP 根目录必须包含 `__init__.py`。
 
-安装时服务端将目录重命名为 `manifest.json` 中 `package.name` 的值：
+安装时服务端将目录重命名为 `manifest.json` 中 `package.id` 的值：
 
-| ZIP 内部结构 | `manifest.json` 中的 `package.name` | 安装后路径 |
+| ZIP 内部结构 | `manifest.json` 中的 `package.id` | 安装后路径 |
 |---|---|---|
-| `MyApp/__init__.py` | `MyApp` | `data/hydroApps/MyApp/` |
-| `my_app/__init__.py` | `MyApp` | `data/hydroApps/MyApp/` |
-| `任意目录名/__init__.py` | `MyApp` | `data/hydroApps/MyApp/` |
+| `MyApp/__init__.py` | `com.example.app` | `data/hydroApps/com.example.app/` |
+| `任意目录名/__init__.py` | `com.example.app` | `data/hydroApps/com.example.app/` |
 
-- `manifest.json` 中 `package.name` 是安装后的目录名，也是 `activate` API 中的 `name` 参数
-- 应用名（`package.name`）应保持稳定；变更会被视为新应用
-- 同名应用重新安装会覆盖旧版本
+- `package.id` 使用反向域名保证唯一性（如 `com.example.app`）
+- `package.id` 是安装后的目录名，也是 `activate` API 中的 `name` 参数
+- `package.displayName` 是启动器中显示的应用名称
+- `package.version` 会在服务端 GUI 中显示
+- 相同 `id` 重新安装会覆盖旧版本
 
 ## 常见模式
 

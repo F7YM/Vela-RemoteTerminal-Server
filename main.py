@@ -1947,7 +1947,7 @@ def _deactivate_app():
 @require_trusted
 def hydro_list():
     apps = list_apps()
-    return jsonify({"apps": [{"name": a["name"], "displayName": a.get("displayName", a["name"])} for a in apps]})
+    return jsonify({"apps": [{"name": a["name"], "displayName": a.get("displayName", a["name"]), "id": a.get("id", ""), "version": a.get("version", "")} for a in apps]})
 
 
 @flask_app.route('/api/hydro/activate', methods=['POST'])
@@ -2701,11 +2701,13 @@ def main(page: ft.Page):
                 name = app["name"]
                 dn = app.get("displayName", name)
                 pid = app.get("id", "")
+                ver = app.get("version", "")
+                ver_text = f" v{ver}" if ver else ""
                 row = ft.Row([
                     ft.Icon(ft.Icons.FOLDER_OPEN, color=ft.Colors.BLUE_300, size=18),
                     ft.Column([
                         ft.Text(dn, size=14, color=ft.Colors.WHITE),
-                        ft.Text(pid, size=10, color=ft.Colors.GREY_500),
+                        ft.Text(f"{pid}{ver_text}", size=10, color=ft.Colors.GREY_500),
                     ], spacing=1),
                     ft.Container(expand=True),
                     ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_size=18, icon_color=ft.Colors.RED_400,

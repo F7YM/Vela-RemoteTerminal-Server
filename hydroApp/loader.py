@@ -81,7 +81,7 @@ def install(zip_path: str) -> str | None:
         # 读取 manifest.json 中的 package.name 作为目录名
         manifest = _read_manifest(app_dir)
         pkg = manifest.get("package", {})
-        target_name = pkg.get("name") or os.path.basename(app_dir)
+        target_name = pkg.get("id") or os.path.basename(app_dir)
         target_path = os.path.join(APPS_DIR, target_name)
         # 如果目标已存在则删除
         if os.path.isdir(target_path):
