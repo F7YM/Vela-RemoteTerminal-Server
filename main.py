@@ -1873,9 +1873,6 @@ def ssh_disconnect():
 
 _active_app = None
 _active_mod = None
-_active_shape = 'circle'
-_active_sw = 466
-_active_sh = 466
 
 from hydroApp.loader import list_apps, load_module, install as _install_app, uninstall as _uninstall_app
 
@@ -1883,15 +1880,14 @@ from hydroApp.loader import list_apps, load_module, install as _install_app, uni
 @flask_app.route('/api/hydro/page', methods=['GET'])
 @require_trusted
 def hydro_page():
-    global _active_shape, _active_sw, _active_sh
-    _active_shape = request.args.get('shape', 'circle')
-    _active_sw = int(request.args.get('sw', '466'))
-    _active_sh = int(request.args.get('sh', '466'))
+    shape = request.args.get('shape', 'circle')
+    sw = int(request.args.get('sw', '466'))
+    sh = int(request.args.get('sh', '466'))
     mod = _get_active_mod()
     if not mod or not hasattr(mod, 'page'):
         return jsonify({"ri": 0, "c": []})
     try:
-        result = mod.page(_active_shape, _active_sw, _active_sh)
+        result = mod.page(shape, sw, sh)
         if hasattr(result, 'to_dict'):
             return jsonify(result.to_dict())
         return jsonify(result)
@@ -1905,6 +1901,9 @@ def hydro_action():
     data = request.get_json(silent=True) or {}
     action_id = data.get('action', '')
     params = data.get('params', {})
+    shape = data.get('shape') or request.args.get('shape', 'circle')
+    sw = int(data.get('sw') or request.args.get('sw', '466'))
+    sh = int(data.get('sh') or request.args.get('sh', '466'))
     mod = _get_active_mod()
     if not mod or not hasattr(mod, 'handle'):
         return jsonify({"toast": "无活跃的 HydroApp"})
@@ -1912,7 +1911,7 @@ def hydro_action():
         import inspect
         sig = inspect.signature(mod.handle)
         if len(sig.parameters) >= 5:
-            result = mod.handle(action_id, params, _active_shape, _active_sw, _active_sh)
+            result = mod.handle(action_id, params, shape, sw, sh)
         else:
             result = mod.handle(action_id, params)
         if hasattr(result, 'to_dict'):
