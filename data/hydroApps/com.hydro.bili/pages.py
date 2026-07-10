@@ -34,8 +34,8 @@ def home_page(shape, videos, mid, name):
     """首页：标题 + 刷新按钮 + 推荐视频列表"""
     items = [
         Row(
-            Text("首页", fs=30, fw="bold"),
-            Button(action="refresh", image="/home/float/下载/ic_fluent_arrow_clockwise_24_filled.png", bg="transparent", h=40, w=40),
+            Text("首页", fs=30, fw="bold", a="tabs", mr=20),
+            Button(action="refresh", image="/home/float/下载/ic_fluent_arrow_clockwise_24_filled.png", bg="transparent", h=48, w=48),
             props={"jc": "center", "ai": "center"},
         ),
     ]
