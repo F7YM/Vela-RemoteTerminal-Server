@@ -2759,14 +2759,15 @@ def main(page: ft.Page):
         root.destroy()
         if not path:
             return
-        name = _install_app(path)
+        name, err = _install_app(path)
         if name:
             hydro_refresh_list(None)
             s = ft.SnackBar(ft.Text(f"已安装: {name}"))
             page.overlay.append(s)
             s.open = True
         else:
-            s = ft.SnackBar(ft.Text("安装失败，压缩包格式不正确"))
+            msg = err or "安装失败，请检查压缩包格式是否正确"
+            s = ft.SnackBar(ft.Text(f"安装失败: {msg}"))
             page.overlay.append(s)
             s.open = True
 

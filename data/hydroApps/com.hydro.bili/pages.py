@@ -34,9 +34,9 @@ def home_page(shape, videos, mid, name):
     """首页：标题 + 刷新按钮 + 推荐视频列表"""
     items = [
         Row(
-            Button("首页", action="tabs", bg="transparent", h=40, fs=30, fw="bold"),
-            Button("刷新", action="refresh", bg="transparent", h=40, fs=18, clr="#aaaaaa"),
-            props={"jc": "space-between", "ai": "center"},
+            Text("首页", fs=30, fw="bold"),
+            Button(action="refresh", image="/home/float/下载/ic_fluent_arrow_clockwise_24_filled.png", bg="transparent", h=40, w=40),
+            props={"jc": "center", "ai": "center"},
         ),
     ]
     if not videos:
@@ -65,9 +65,26 @@ def tabs_page(shape):
     """Tab 切换页"""
     return Page(
         Text("切换页面", fs=28, clr="#ffffff", fw="bold", mt=10),
-        Button("  首页  ", action="home", bg="#2196F3", w=220, h=48, br=24, mt=20, fs=22),
-        Button("  我的  ", action="mine", bg="#555555", w=220, h=48, br=24, mt=14, fs=22),
-        Button("  关闭  ", action="exit", bg="#f44336", w=220, h=48, br=24, mt=14, fs=22),
+        Row(
+            Column(
+                Image(src="/home/float/下载/ic_fluent_home_24_filled.png", w=48, h=48),
+                Text("首页", fs=16, clr="#ffffff", mt=4),
+                a="home",
+                props={"ai": "center"},
+            ),
+            Column(
+                Image(src="/home/float/下载/ic_fluent_person_24_filled.png", w=48, h=48),
+                Text("我的", fs=16, clr="#ffffff", mt=4),
+                a="mine",
+                props={"ai": "center"},
+            ),
+            Column(
+                Text("关闭", fs=16, clr="#ffffff"),
+                a="exit",
+                props={"ai": "center", "jc": "center"},
+            ),
+            props={"jc": "center", "ai": "center"},
+        ),
         content_style=safe_area_style(shape),
     )
 

@@ -93,7 +93,8 @@ def load_module(name: str):
     return mod
 
 
-def install(zip_path: str) -> str | None:
+def install(zip_path: str):
+    """安装 HydroApp，返回 (name, error) 元组。成功时 error 为 None，失败时 name 为 None。"""
     try:
         tmp = tempfile.mkdtemp()
         with zipfile.ZipFile(zip_path, 'r') as zf:
@@ -108,14 +109,13 @@ def install(zip_path: str) -> str | None:
                 break
         if not app_dir:
             shutil.rmtree(tmp)
-            return None
+            return None, "压缩包中未找到 HydroApp 目录"
         # 读取 manifest.json 中的 package.name 作为目录名
         manifest = _read_manifest(app_dir)
         valid, err = validate_manifest(manifest)
         if not valid:
             shutil.rmtree(tmp)
-            print(f"[HydroApp] 安装失败: {err}", flush=True)
-            return None
+            return None, err
         pkg = manifest.get("package", {})
         target_name = pkg.get("id") or os.path.basename(app_dir)
         target_path = os.path.join(APPS_DIR, target_name)
@@ -125,9 +125,9 @@ def install(zip_path: str) -> str | None:
         os.makedirs(APPS_DIR, exist_ok=True)
         shutil.move(app_dir, target_path)
         shutil.rmtree(tmp)
-        return target_name
-    except Exception:
-        return None
+        return target_name, None
+    except Exception as e:
+        return None, str(e)
 
 
 def uninstall(name: str) -> bool:
