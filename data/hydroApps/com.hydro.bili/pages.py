@@ -35,7 +35,7 @@ def home_page(shape, videos, mid, name):
     items = [
         Row(
             Button("首页", action="tabs", bg="transparent", h=48, fs=30, fw="bold", mr=20),
-            Button(action="refresh", image="/api/hydro/icon/ic_fluent_arrow_clockwise_24_filled.png", bg="transparent", h=48, w=48),
+            Button(action="refresh", image="/hydro-icons/ic_fluent_arrow_clockwise_24_filled.png", bg="transparent", h=48, w=48),
             props={"jc": "center", "ai": "center"},
         ),
     ]
@@ -67,19 +67,21 @@ def tabs_page(shape):
         Text("切换页面", fs=28, clr="#ffffff", fw="bold", mt=10),
         Row(
             Column(
-                Image(src="/api/hydro/icon/ic_fluent_home_24_filled.png", w=48, h=48),
-                Text("首页", fs=16, clr="#ffffff", mt=4),
+                Image(src="/hydro-icons/ic_fluent_home_24_filled.png", w=64, h=64),
+                Text("首页", fs=18, clr="#ffffff", mt=6),
                 a="home",
                 props={"ai": "center"},
+                mr=40,
             ),
             Column(
-                Image(src="/api/hydro/icon/ic_fluent_person_24_filled.png", w=48, h=48),
-                Text("我的", fs=16, clr="#ffffff", mt=4),
+                Image(src="/hydro-icons/ic_fluent_person_24_filled.png", w=64, h=64),
+                Text("我的", fs=18, clr="#ffffff", mt=6),
                 a="mine",
                 props={"ai": "center"},
+                mr=40,
             ),
             Column(
-                Text("关闭", fs=16, clr="#ffffff"),
+                Text("关闭", fs=18, clr="#ffffff"),
                 a="exit",
                 props={"ai": "center", "jc": "center"},
             ),
