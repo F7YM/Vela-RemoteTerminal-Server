@@ -24,7 +24,7 @@ import threading
 import paramiko
 import hashlib
 from datetime import datetime
-from flask import Flask, request, jsonify, send_file, abort
+from flask import Flask, request, jsonify, send_file, abort, g
 from flask_cors import CORS
 from werkzeug.serving import make_server
 
@@ -1883,6 +1883,7 @@ def hydro_page():
     shape = request.args.get('shape', 'circle')
     sw = int(request.args.get('sw', '466'))
     sh = int(request.args.get('sh', '466'))
+    g.base_url = request.host_url.rstrip('/')
     mod = _get_active_mod()
     if not mod or not hasattr(mod, 'page'):
         return jsonify({"ri": 0, "c": []})
@@ -1904,6 +1905,7 @@ def hydro_action():
     shape = data.get('shape') or request.args.get('shape', 'circle')
     sw = int(data.get('sw') or request.args.get('sw', '466'))
     sh = int(data.get('sh') or request.args.get('sh', '466'))
+    g.base_url = request.host_url.rstrip('/')
     mod = _get_active_mod()
     if not mod or not hasattr(mod, 'handle'):
         return jsonify({"toast": "无活跃的 HydroApp"})
@@ -1965,6 +1967,23 @@ def hydro_activate_api():
         return jsonify({"status": "ok", "message": f"已激活 {name}"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@flask_app.route('/api/hydro/qr_image', methods=['GET'])
+def hydro_qr_image():
+    data = request.args.get('data', '')
+    if not data:
+        return 'missing data', 400
+    try:
+        import qrcode
+        from io import BytesIO
+        img = qrcode.make(data)
+        buf = BytesIO()
+        img.save(buf, format='PNG')
+        buf.seek(0)
+        return send_file(buf, mimetype='image/png')
+    except Exception as e:
+        return str(e), 500
 
 
 # ============ 系统信息函数 ============
