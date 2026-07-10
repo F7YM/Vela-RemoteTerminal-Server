@@ -4,6 +4,8 @@ class Switch(UIComponent):
     type = "sw"
 
     def __init__(self, checked: bool = False, action: str = "", props: dict | None = None, **styles):
+        if 'chk' in styles:
+            checked = styles.pop('chk')
         super().__init__(props=props, **styles)
         self.checked = checked
         self.action = action
