@@ -1988,11 +1988,11 @@ def hydro_qr_image():
         return str(e), 500
 
 
-@flask_app.route('/api/hydro/icon/<path:filename>')
+@flask_app.route('/hydro-icons/<path:filename>')
 def hydro_icon(filename):
     import os
     from flask import safe_join
-    icon_dir = os.path.expanduser('~/下载')
+    icon_dir = os.path.join(os.path.dirname(__file__), 'data', 'hydroApps', 'com.hydro.bili', 'icons')
     try:
         safe_path = safe_join(icon_dir, filename)
         if safe_path and os.path.isfile(safe_path):

@@ -67,21 +67,21 @@ def tabs_page(shape):
         Text("切换页面", fs=28, clr="#ffffff", fw="bold", mt=10),
         Row(
             Column(
-                Image(src="/hydro-icons/ic_fluent_home_24_filled.png", w=64, h=64),
-                Text("首页", fs=18, clr="#ffffff", mt=6),
+                Image(src="/hydro-icons/ic_fluent_home_24_filled.png", w=80, h=80),
+                Text("首页", fs=22, clr="#ffffff", mt=8),
                 a="home",
                 props={"ai": "center"},
-                mr=40,
+                mr=50,
             ),
             Column(
-                Image(src="/hydro-icons/ic_fluent_person_24_filled.png", w=64, h=64),
-                Text("我的", fs=18, clr="#ffffff", mt=6),
+                Image(src="/hydro-icons/ic_fluent_person_24_filled.png", w=80, h=80),
+                Text("我的", fs=22, clr="#ffffff", mt=8),
                 a="mine",
                 props={"ai": "center"},
-                mr=40,
+                mr=50,
             ),
             Column(
-                Text("关闭", fs=18, clr="#ffffff"),
+                Text("关闭", fs=22, clr="#ffffff"),
                 a="exit",
                 props={"ai": "center", "jc": "center"},
             ),
