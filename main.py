@@ -1872,6 +1872,7 @@ def ssh_disconnect():
 # ============ hydroApp 远程UI ============
 
 _active_app = None
+_active_mod = None
 
 from hydroApp.loader import list_apps, load_module, install as _install_app, uninstall as _uninstall_app
 
@@ -1913,19 +1914,24 @@ def hydro_action():
 
 
 def _get_active_mod():
-    global _active_app
+    global _active_app, _active_mod
     if not _active_app:
         return None
-    return load_module(_active_app)
+    if _active_mod is None:
+        _active_mod = load_module(_active_app)
+    return _active_mod
 
 
 def _activate_app(name):
-    global _active_app
+    global _active_app, _active_mod
     _active_app = name
+    _active_mod = None
 
 
 def _deactivate_app():
-    global _active_app
+    global _active_app, _active_mod
+    _active_app = None
+    _active_mod = None
     _active_app = None
 
 
