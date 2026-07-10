@@ -104,15 +104,15 @@ def video_detail(shape, video):
     ]
     if pic:
         items.append(Image(src=pic + "@466w_260h", w=466, h=260, of="cover"))
-    items.append(Text(title, fs=22, clr="#ffffff", fw="bold", mt=10))
+    items.append(Text(title, fs=26, clr="#ffffff", fw="bold", mt=10))
     items.append(Row(
         Image(src=owner.get("face", "") + "@48w_48h", w=48, h=48, br=24) if owner.get("face") else None,
-        Text(owner.get("name", ""), fs=18, clr="#aaaaaa", ml=10),
+        Text(owner.get("name", ""), fs=20, clr="#ffffff", ml=10),
         props={"ai": "center", "jc": "flex-start"},
     ))
-    items.append(Text(f"{_format_num(stat.get('view', 0))}播放 · {_format_num(stat.get('danmaku', 0))}弹幕 · {_format_num(stat.get('like', 0))}点赞", fs=14, clr="#888888", mt=10))
+    items.append(Text(f"{_format_num(stat.get('view', 0))}播放 · {_format_num(stat.get('danmaku', 0))}弹幕 · {_format_num(stat.get('like', 0))}点赞", fs=18, clr="#ffffff", mt=10))
     if desc:
-        items.append(Text(desc, fs=16, clr="#cccccc", mt=10))
+        items.append(Text(desc, fs=18, clr="#ffffff", mt=10))
     return Page(*items, content_style=safe_area_style(shape))
 
 
