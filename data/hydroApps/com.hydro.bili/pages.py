@@ -60,7 +60,7 @@ def tabs_page(shape):
 def mine_page(shape, mid, name):
     """我的页面：用户信息 + 退出"""
     return Page(
-        Button("首页", action="home", bg="transparent", h=34, mt=6, fs=26, fw="bold"),
+        Button("我的", action="tabs", bg="transparent", h=34, mt=6, fs=26, fw="bold"),
         Text("已登录", fs=26, clr="#4CAF50", fw="bold", mt=12),
         Text(f"UID: {mid}", fs=18, clr="#ffffff", mt=6),
         Text(name, fs=20, clr="#ffffff", mt=4),
