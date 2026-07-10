@@ -248,28 +248,46 @@ return {"nav": "/some_page", "params": {...}}
 - 响应中**无** `tick` → 客户端清除定时器
 - 切换页面（加载新 `c`）时，新响应中是否带 `tick` 决定定时器的去留
 
-### Cookie 持久化
+### 客户端数据持久化
 
-HydroApp 支持客户端（手表端）持久化存储任意 key-value 数据，用于登录态保持等场景。
+HydroApp 支持客户端（手表端）通过 `@system.storage` 持久化存储任意 key-value 数据，用于登录态保持、设置记忆等场景。
 
 **协议：**
 
 | 响应字段 | 说明 |
 |---|---|
-| `_cookies` | 告诉客户端存储此 cookie 数据（内部存为 `hydro_cookies`） |
-| `_logout` | 告诉客户端清除已存储的 cookie |
+| `_store` | 告诉客户端用 `storage.set()` 持久化此对象的所有键值对 |
+| `_clearStore` | 数组格式的键名列表，客户端逐条调用 `storage.delete()` 删除 |
 
 **请求参数：**
-- 每次 `POST /api/hydro/action` 时，客户端自动在 `params._cookies` 中附带已存储的 cookie 字符串
-- 服务端 `handle()` 读取 `params.get("_cookies")` 来恢复登录态
+- 每次 `POST /api/hydro/action` 时，客户端自动将所有已持久化的数据以序列化字符串形式附在 `params._store` 中
+- 服务端 `handle()` 通过 `params.get("_store")` 读取并恢复
 
-**示例流程（Bilibili 扫码登录）：**
-```
-1. 未登录 → 点击"扫码登录"
-2. 服务端生成二维码 → 客户端轮询
-3. 扫码成功 → 服务端返回 {"_cookies": {...cookies...}, ...}
-4. 客户端存储 cookie 到 @system.storage
-5. 下次打开 → 客户端附带 params._cookies → 服务端验证 → 直接显示"已登录"
+**示例：**
+```python
+# 服务端存储数据到客户端
+return {
+    "toast": "登录成功",
+    "_store": {"token": "abc123", "user_id": 42},
+    ...
+}
+
+# 服务端清除客户端数据
+return {
+    "_clearStore": ["token", "user_id"],
+    ...
+}
+
+# 服务端读取客户端数据
+def handle(action, params, ...):
+    store = {}
+    if isinstance(params, dict):
+        raw = params.get("_store")
+        if isinstance(raw, str):
+            import json
+            try: store = json.loads(raw)
+            except: pass
+    token = store.get("token", "")
 ```
 
 ## handle(action, params, shape, sw, sh)
