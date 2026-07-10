@@ -51,8 +51,10 @@ def load_module(name: str):
     path = get_app_path(name)
     if not path:
         return None
-    if name in sys.modules:
-        del sys.modules[name]
+    # 清除所有相关子模块缓存，确保代码修改生效
+    for mod_name in list(sys.modules.keys()):
+        if mod_name == name or mod_name.startswith(name + '.'):
+            del sys.modules[mod_name]
     spec = importlib.util.spec_from_file_location(name, os.path.join(path, '__init__.py'))
     if not spec or not spec.loader:
         return None

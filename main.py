@@ -24,7 +24,7 @@ import threading
 import paramiko
 import hashlib
 from datetime import datetime
-from flask import Flask, request, jsonify, send_file, abort, g
+from flask import Flask, request, jsonify, send_file, abort
 from flask_cors import CORS
 from werkzeug.serving import make_server
 
@@ -1883,10 +1883,11 @@ def hydro_page():
     shape = request.args.get('shape', 'circle')
     sw = int(request.args.get('sw', '466'))
     sh = int(request.args.get('sh', '466'))
-    g.base_url = request.host_url.rstrip('/')
     mod = _get_active_mod()
     if not mod or not hasattr(mod, 'page'):
         return jsonify({"ri": 0, "c": []})
+    if hasattr(mod, 'pages'):
+        mod.pages._base_url = request.host_url.rstrip('/')
     try:
         result = mod.page(shape, sw, sh)
         if hasattr(result, 'to_dict'):
@@ -1905,10 +1906,11 @@ def hydro_action():
     shape = data.get('shape') or request.args.get('shape', 'circle')
     sw = int(data.get('sw') or request.args.get('sw', '466'))
     sh = int(data.get('sh') or request.args.get('sh', '466'))
-    g.base_url = request.host_url.rstrip('/')
     mod = _get_active_mod()
     if not mod or not hasattr(mod, 'handle'):
         return jsonify({"toast": "无活跃的 HydroApp"})
+    if hasattr(mod, 'pages'):
+        mod.pages._base_url = request.host_url.rstrip('/')
     try:
         import inspect
         sig = inspect.signature(mod.handle)
