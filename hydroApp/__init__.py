@@ -5,4 +5,4 @@ from .image import Image
 from .text_input import TextInput
 from .switch import Switch
 from .layout import Row, Column
-from .page import Page
+from .page import Page, safe_area_style
