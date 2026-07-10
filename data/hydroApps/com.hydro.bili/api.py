@@ -70,7 +70,7 @@ BILI_POPULAR = "https://api.bilibili.com/x/web-interface/popular"
 
 
 def fetch_popular(cookies: dict) -> list:
-    """获取热门推荐视频列表"""
+    """获取热门推荐视频列表（备用）"""
     if not cookies:
         return []
     try:
@@ -78,6 +78,40 @@ def fetch_popular(cookies: dict) -> list:
         data = resp.json()
         if data.get("code") == 0:
             return data.get("data", {}).get("list", [])
+    except Exception:
+        pass
+    return []
+
+
+BILI_RCMD = "https://api.bilibili.com/x/web-interface/index/top/rcmd"
+
+
+def fetch_recommend(cookies: dict) -> list:
+    """获取个性化推荐视频列表（每次返回不同内容）"""
+    if not cookies:
+        return []
+    try:
+        import time
+        params = {
+            "fresh_type": 4,
+            "ps": 12,
+            "version": 1,
+            "wts": int(time.time()),
+        }
+        resp = _get(BILI_RCMD, params=params, cookies=cookies)
+        data = resp.json()
+        if data.get("code") == 0:
+            items = data.get("data", {}).get("item", [])
+            # 只保留视频（过滤直播、番剧等）
+            videos = []
+            for item in items:
+                if item.get("goto") == "av":
+                    videos.append({
+                        "title": item.get("title", ""),
+                        "owner": item.get("owner", {}),
+                        "stat": item.get("stat", {}),
+                    })
+            return videos
     except Exception:
         pass
     return []

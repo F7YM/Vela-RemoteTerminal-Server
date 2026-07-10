@@ -1,6 +1,6 @@
 """HydroBili — Bilibili 扫码登录"""
 
-from .api import verify_cookies, fetch_popular, fetch_user_card
+from .api import verify_cookies, fetch_recommend, fetch_user_card
 from .pages import landing_page, home_page, tabs_page, mine_page
 from .login import do_generate, do_poll
 
@@ -25,7 +25,7 @@ def _restore(store: dict):
 
 def _build_home(shape):
     """获取推荐视频并构建首页"""
-    videos = fetch_popular(_cache["cookies"]) if _cache["cookies"] else []
+    videos = fetch_recommend(_cache["cookies"]) if _cache["cookies"] else []
     return home_page(shape, videos, _cache["mid"], _cache["name"])
 
 
