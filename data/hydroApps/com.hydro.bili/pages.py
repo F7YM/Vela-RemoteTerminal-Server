@@ -31,9 +31,13 @@ def landing_page(shape, logged_in=False, mid=0, name=""):
 
 
 def home_page(shape, videos, mid, name):
-    """首页：可点击标题 + 推荐视频列表"""
+    """首页：标题 + 刷新按钮 + 推荐视频列表"""
     items = [
-        Button("首页", action="tabs", bg="transparent", h=40, mt=8, fs=30, fw="bold"),
+        Row(
+            Button("首页", action="tabs", bg="transparent", h=40, fs=30, fw="bold"),
+            Button("刷新", action="refresh", bg="transparent", h=40, fs=18, clr="#aaaaaa"),
+            props={"jc": "space-between", "ai": "center"},
+        ),
     ]
     if not videos:
         items.append(Text("加载推荐中...", fs=22, clr="#aaaaaa", mt=20))
