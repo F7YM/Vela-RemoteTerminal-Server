@@ -216,6 +216,9 @@ safe_area_style(shape: str) → str
 | `nav` | `str` | 路由跳转（Vela 页面 URI） |
 | `params` | `dict` | 跳转附带参数 |
 | `tick` | `int` | 定时器间隔（毫秒），>0 时客户端定期调 POST /action 发 `{action:"tick"}` |
+| `scrollTop` | `bool` | 页面导航时设为 `true`，客户端滚动到顶部 |
+| `_cookies` | `dict` | 客户端存储的 cookie 数据（手表端 `@system.storage` 持久化） |
+| `_logout` | `bool` | 清除客户端存储的 cookie |
 
 ### return 模式
 
@@ -244,6 +247,30 @@ return {"nav": "/some_page", "params": {...}}
 - 响应中**有** `tick` → 客户端启动/重启定时器
 - 响应中**无** `tick` → 客户端清除定时器
 - 切换页面（加载新 `c`）时，新响应中是否带 `tick` 决定定时器的去留
+
+### Cookie 持久化
+
+HydroApp 支持客户端（手表端）持久化存储任意 key-value 数据，用于登录态保持等场景。
+
+**协议：**
+
+| 响应字段 | 说明 |
+|---|---|
+| `_cookies` | 告诉客户端存储此 cookie 数据（内部存为 `hydro_cookies`） |
+| `_logout` | 告诉客户端清除已存储的 cookie |
+
+**请求参数：**
+- 每次 `POST /api/hydro/action` 时，客户端自动在 `params._cookies` 中附带已存储的 cookie 字符串
+- 服务端 `handle()` 读取 `params.get("_cookies")` 来恢复登录态
+
+**示例流程（Bilibili 扫码登录）：**
+```
+1. 未登录 → 点击"扫码登录"
+2. 服务端生成二维码 → 客户端轮询
+3. 扫码成功 → 服务端返回 {"_cookies": {...cookies...}, ...}
+4. 客户端存储 cookie 到 @system.storage
+5. 下次打开 → 客户端附带 params._cookies → 服务端验证 → 直接显示"已登录"
+```
 
 ## handle(action, params, shape, sw, sh)
 
