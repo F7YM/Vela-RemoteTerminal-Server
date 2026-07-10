@@ -37,8 +37,6 @@ class UIComponent:
             s = build_style(self.props)
             if s:
                 item["s"] = s
-            if self.props.get("a"):
-                item["a"] = self.props["a"]
         return item
 
 
@@ -48,19 +46,7 @@ class Container(UIComponent):
         self.children = list(children)
 
     def to_dict(self) -> dict:
-        if self.props.get("a"):
-            self._propagate_action(self.props["a"])
         item = super().to_dict()
         if self.children:
             item["c"] = [c.to_dict() for c in self.children]
-        if self.props.get("a"):
-            item["a"] = self.props["a"]
         return item
-
-    def _propagate_action(self, action: str):
-        for child in self.children:
-            if isinstance(child, UIComponent):
-                if not getattr(child, "action", None) and not child.props.get("a"):
-                    child.props["a"] = action
-                if hasattr(child, "_propagate_action"):
-                    child._propagate_action(action)

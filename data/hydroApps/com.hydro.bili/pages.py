@@ -49,23 +49,15 @@ def home_page(shape, videos, mid, name):
             pic = v.get("pic", "")
             if pic and not pic.startswith("http"):
                 pic = "http:" + pic
-            info_col = Column(
-                Text(title, fs=20, clr="#ffffff"),
-                Text(f"{owner} · {view}播放", fs=14, clr="#888888", mt=6),
-            )
+            btn_text = title + "\n" + owner + " · " + view + "播放"
             if pic:
                 items.append(Row(
                     Image(src=pic + "@160w_100h", w=160, h=100, br=8, of="cover"),
-                    info_col,
-                    a=f"video_detail_{i}",
+                    Button(btn_text, action=f"video_detail_{i}", bg="transparent", fs=18, ta="left"),
                     props={"jc": "flex-start", "ai": "flex-start"},
                 ))
             else:
-                items.append(Column(
-                    Text(title, fs=20, clr="#ffffff"),
-                    Text(f"{owner} · {view}播放", fs=14, clr="#888888", mt=3),
-                    a=f"video_detail_{i}",
-                ))
+                items.append(Button(btn_text, action=f"video_detail_{i}", bg="transparent", fs=18, ta="left", mt=10))
     return Page(*items, content_style=safe_area_style(shape))
 
 

@@ -1,5 +1,6 @@
 from .base import UIComponent
 
+
 class Button(UIComponent):
     type = "btn"
 
