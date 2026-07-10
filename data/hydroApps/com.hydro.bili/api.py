@@ -107,6 +107,7 @@ def fetch_recommend(cookies: dict) -> list:
             for item in items:
                 if item.get("goto") == "av":
                     videos.append({
+                        "bvid": item.get("bvid", ""),
                         "title": item.get("title", ""),
                         "owner": item.get("owner", {}),
                         "stat": item.get("stat", {}),
@@ -116,6 +117,30 @@ def fetch_recommend(cookies: dict) -> list:
     except Exception:
         pass
     return []
+
+
+BILI_VIEW = "https://api.bilibili.com/x/web-interface/view"
+
+
+def fetch_video_info(bvid: str, cookies: dict) -> dict:
+    """获取视频详细信息，返回标准化字段或 {}"""
+    try:
+        resp = _get(BILI_VIEW, params={"bvid": bvid}, cookies=cookies)
+        data = resp.json()
+        if data.get("code") != 0:
+            return {}
+        d = data.get("data", {})
+        return {
+            "bvid": d.get("bvid", ""),
+            "title": d.get("title", ""),
+            "pic": d.get("pic", ""),
+            "desc": d.get("desc", "") or "",
+            "duration": d.get("duration", 0),
+            "owner": d.get("owner", {}),
+            "stat": d.get("stat", {}),
+        }
+    except Exception:
+        return {}
 
 
 def verify_cookies(cookies: dict) -> tuple:

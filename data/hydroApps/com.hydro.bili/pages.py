@@ -42,7 +42,7 @@ def home_page(shape, videos, mid, name):
     if not videos:
         items.append(Text("加载推荐中...", fs=22, clr="#aaaaaa", mt=20))
     else:
-        for v in videos:
+        for i, v in enumerate(videos):
             title = v.get("title", "")
             owner = v.get("owner", {}).get("name", "未知")
             view = _format_num(v.get("stat", {}).get("view", 0))
@@ -57,11 +57,15 @@ def home_page(shape, videos, mid, name):
                 items.append(Row(
                     Image(src=pic + "@160w_100h", w=160, h=100, br=8, of="cover"),
                     info_col,
+                    a=f"video_detail_{i}",
                     props={"jc": "flex-start", "ai": "flex-start"},
                 ))
             else:
-                items.append(Text(title, fs=20, clr="#ffffff", mt=10))
-                items.append(Text(f"{owner} · {view}播放", fs=14, clr="#888888", mt=3))
+                items.append(Column(
+                    Text(title, fs=20, clr="#ffffff"),
+                    Text(f"{owner} · {view}播放", fs=14, clr="#888888", mt=3),
+                    a=f"video_detail_{i}",
+                ))
     return Page(*items, content_style=safe_area_style(shape))
 
 
@@ -89,6 +93,34 @@ def mine_page(shape, face, name):
     else:
         items.append(Text(name, fs=24, clr="#ffffff", mt=4))
     items.append(Button("退出登录", action="logout", bg="#f44336", w=220, h=48, br=24, mt=24, fs=22))
+    return Page(*items, content_style=safe_area_style(shape))
+
+
+def video_detail(shape, video):
+    """视频详情页"""
+    if not video:
+        return Page(Text("视频不存在", fs=20, clr="#f44336", mt=20), content_style=safe_area_style(shape))
+    title = video.get("title", "")
+    pic = video.get("pic", "")
+    owner = video.get("owner", {})
+    stat = video.get("stat", {})
+    desc = video.get("desc", "")
+    if pic and not pic.startswith("http"):
+        pic = "http:" + pic
+    items = [
+        Button("返回", action="home", bg="transparent", h=40, mt=8, fs=26, fw="bold"),
+    ]
+    if pic:
+        items.append(Image(src=pic + "@466w_260h", w=466, h=260, of="cover"))
+    items.append(Text(title, fs=22, clr="#ffffff", fw="bold", mt=10))
+    items.append(Row(
+        Image(src=owner.get("face", "") + "@48w_48h", w=48, h=48, br=24) if owner.get("face") else None,
+        Text(owner.get("name", ""), fs=18, clr="#aaaaaa", ml=10),
+        props={"ai": "center", "jc": "flex-start"},
+    ))
+    items.append(Text(f"{_format_num(stat.get('view', 0))}播放 · {_format_num(stat.get('danmaku', 0))}弹幕 · {_format_num(stat.get('like', 0))}点赞", fs=14, clr="#888888", mt=10))
+    if desc:
+        items.append(Text(desc, fs=16, clr="#cccccc", mt=10))
     return Page(*items, content_style=safe_area_style(shape))
 
 

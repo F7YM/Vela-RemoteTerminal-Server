@@ -1,7 +1,7 @@
 """HydroBili — Bilibili 扫码登录"""
 
-from .api import verify_cookies, fetch_recommend, fetch_user_card
-from .pages import landing_page, home_page, tabs_page, mine_page
+from .api import verify_cookies, fetch_recommend, fetch_user_card, fetch_video_info
+from .pages import landing_page, home_page, tabs_page, mine_page, video_detail
 from .login import do_generate, do_poll
 
 _cache = {
@@ -26,6 +26,7 @@ def _restore(store: dict):
 def _build_home(shape):
     """获取推荐视频并构建首页"""
     videos = fetch_recommend(_cache["cookies"]) if _cache["cookies"] else []
+    _cache["bids"] = [v.get("bvid", "") for v in videos]
     return home_page(shape, videos, _cache["mid"], _cache["name"])
 
 
@@ -96,6 +97,23 @@ def handle(action, params, shape=None, sw=0, sh=0):
         if _cache["cookies"]:
             return _build_mine(shape).to_dict()
         return {"toast": "未登录"}
+
+    # 视频详情
+    elif action.startswith("video_detail_"):
+        if not _cache["cookies"]:
+            return {"toast": "未登录"}
+        try:
+            idx = int(action.split("_")[-1])
+            bids = _cache.get("bids", [])
+            if idx < 0 or idx >= len(bids):
+                return {"toast": "视频不存在"}
+            bvid = bids[idx]
+        except (ValueError, IndexError):
+            return {"toast": "视频不存在"}
+        video = fetch_video_info(bvid, _cache["cookies"])
+        if not video:
+            return {"toast": "获取视频信息失败"}
+        return video_detail(shape, video).to_dict()
 
     # 生成二维码
     elif action == "generate":

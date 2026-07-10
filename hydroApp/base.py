@@ -49,4 +49,6 @@ class Container(UIComponent):
         item = super().to_dict()
         if self.children:
             item["c"] = [c.to_dict() for c in self.children]
+        if self.props.get("a"):
+            item["a"] = self.props["a"]
         return item
