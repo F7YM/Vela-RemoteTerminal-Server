@@ -53,11 +53,11 @@ def home_page(shape, videos, mid, name):
             if pic:
                 items.append(Row(
                     Image(src=pic + "@160w_100h", w=160, h=100, br=8, of="cover"),
-                    Button(btn_text, action=f"video_detail_{i}", bg="transparent", fs=18, ta="left"),
+                    Button(btn_text, action=f"video_detail_{i}", bg="transparent", fs=16, ta="left"),
                     props={"jc": "flex-start", "ai": "flex-start"},
                 ))
             else:
-                items.append(Button(btn_text, action=f"video_detail_{i}", bg="transparent", fs=18, ta="left", mt=10))
+                items.append(Button(btn_text, action=f"video_detail_{i}", bg="transparent", fs=16, ta="left", mt=10))
     return Page(*items, content_style=safe_area_style(shape))
 
 
