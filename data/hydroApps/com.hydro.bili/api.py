@@ -110,6 +110,7 @@ def fetch_recommend(cookies: dict) -> list:
                         "title": item.get("title", ""),
                         "owner": item.get("owner", {}),
                         "stat": item.get("stat", {}),
+                        "pic": item.get("pic", ""),
                     })
             return videos
     except Exception:

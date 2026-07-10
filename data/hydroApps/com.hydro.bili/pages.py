@@ -1,7 +1,7 @@
 """UI 页面构建"""
 
 import urllib.parse
-from hydroApp import Page, Text, Button, Image, Row, safe_area_style
+from hydroApp import Page, Text, Button, Image, Row, Column, safe_area_style
 
 _base_url = ""
 
@@ -46,8 +46,22 @@ def home_page(shape, videos, mid, name):
             title = v.get("title", "")
             owner = v.get("owner", {}).get("name", "未知")
             view = _format_num(v.get("stat", {}).get("view", 0))
-            items.append(Text(title, fs=22, clr="#ffffff", mt=14))
-            items.append(Text(f"{owner} · {view}播放", fs=16, clr="#888888", mt=4))
+            pic = v.get("pic", "")
+            if pic and not pic.startswith("http"):
+                pic = "http:" + pic
+            info_col = Column(
+                Text(title, fs=20, clr="#ffffff"),
+                Text(f"{owner} · {view}播放", fs=14, clr="#888888", mt=6),
+            )
+            if pic:
+                items.append(Row(
+                    Image(src=pic + "@160w_100h", w=160, h=100, br=8),
+                    info_col,
+                    props={"jc": "flex-start", "ai": "flex-start"},
+                ))
+            else:
+                items.append(Text(title, fs=20, clr="#ffffff", mt=10))
+                items.append(Text(f"{owner} · {view}播放", fs=14, clr="#888888", mt=3))
     return Page(*items, content_style=safe_area_style(shape))
 
 
