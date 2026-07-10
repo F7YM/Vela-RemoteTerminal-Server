@@ -44,7 +44,9 @@ def _build_mine(shape):
     return mine_page(shape, face, name)
 
 
-def page(shape, sw, sh):
+def page(shape, sw, sh, store=None):
+    if store:
+        _restore(store)
     return landing_page(shape, logged_in=bool(_cache["cookies"]), mid=_cache["mid"], name=_cache["name"])
 
 

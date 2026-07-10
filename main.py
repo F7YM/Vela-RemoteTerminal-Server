@@ -1883,13 +1883,21 @@ def hydro_page():
     shape = request.args.get('shape', 'circle')
     sw = int(request.args.get('sw', '466'))
     sh = int(request.args.get('sh', '466'))
+    import json as _json
+    store_raw = request.args.get('_store')
+    client_store = {}
+    if store_raw:
+        try:
+            client_store = _json.loads(store_raw)
+        except Exception:
+            pass
     mod = _get_active_mod()
     if not mod or not hasattr(mod, 'page'):
         return jsonify({"ri": 0, "c": []})
     if hasattr(mod, 'pages'):
         mod.pages._base_url = request.host_url.rstrip('/')
     try:
-        result = mod.page(shape, sw, sh)
+        result = mod.page(shape, sw, sh, store=client_store)
         if hasattr(result, 'to_dict'):
             return jsonify(result.to_dict())
         return jsonify(result)
