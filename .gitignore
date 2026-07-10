@@ -11,3 +11,4 @@ data/
 *.tar.gz
 rpm/
 .vscode/
+data/hydroApps/**/__pycache__
