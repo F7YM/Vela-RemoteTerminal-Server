@@ -1988,6 +1988,20 @@ def hydro_qr_image():
         return str(e), 500
 
 
+@flask_app.route('/api/hydro/icon/<path:filename>')
+def hydro_icon(filename):
+    import os
+    from flask import safe_join
+    icon_dir = os.path.expanduser('~/下载')
+    try:
+        safe_path = safe_join(icon_dir, filename)
+        if safe_path and os.path.isfile(safe_path):
+            return send_file(safe_path, mimetype='image/png')
+    except Exception:
+        pass
+    return 'not found', 404
+
+
 # ============ 系统信息函数 ============
 
 def get_system_info():

@@ -34,8 +34,8 @@ def home_page(shape, videos, mid, name):
     """首页：标题 + 刷新按钮 + 推荐视频列表"""
     items = [
         Row(
-            Text("首页", fs=30, fw="bold", a="tabs", mr=20),
-            Button(action="refresh", image="/home/float/下载/ic_fluent_arrow_clockwise_24_filled.png", bg="transparent", h=48, w=48),
+            Button("首页", action="tabs", bg="transparent", h=48, fs=30, fw="bold", mr=20),
+            Button(action="refresh", image="/api/hydro/icon/ic_fluent_arrow_clockwise_24_filled.png", bg="transparent", h=48, w=48),
             props={"jc": "center", "ai": "center"},
         ),
     ]
@@ -67,13 +67,13 @@ def tabs_page(shape):
         Text("切换页面", fs=28, clr="#ffffff", fw="bold", mt=10),
         Row(
             Column(
-                Image(src="/home/float/下载/ic_fluent_home_24_filled.png", w=48, h=48),
+                Image(src="/api/hydro/icon/ic_fluent_home_24_filled.png", w=48, h=48),
                 Text("首页", fs=16, clr="#ffffff", mt=4),
                 a="home",
                 props={"ai": "center"},
             ),
             Column(
-                Image(src="/home/float/下载/ic_fluent_person_24_filled.png", w=48, h=48),
+                Image(src="/api/hydro/icon/ic_fluent_person_24_filled.png", w=48, h=48),
                 Text("我的", fs=16, clr="#ffffff", mt=4),
                 a="mine",
                 props={"ai": "center"},
