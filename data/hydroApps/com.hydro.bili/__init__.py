@@ -1,0 +1,131 @@
+"""HydroBili — Bilibili 扫码登录"""
+
+from .api import verify_cookies, fetch_popular
+from .pages import landing_page, home_page, tabs_page, mine_page
+from .login import do_generate, do_poll
+
+_cache = {
+    "cookies": {},
+    "mid": 0,
+    "name": "",
+    "qrcode_key": "",
+}
+
+
+def _restore(store: dict):
+    """用客户端持久化的数据恢复会话"""
+    cookies = store.get("bili_cookies", {})
+    if cookies and not _cache["cookies"]:
+        mid, name = verify_cookies(cookies)
+        if mid:
+            _cache["cookies"] = cookies
+            _cache["mid"] = mid
+            _cache["name"] = name
+
+
+def _build_home(shape):
+    """获取推荐视频并构建首页"""
+    videos = fetch_popular(_cache["cookies"]) if _cache["cookies"] else []
+    return home_page(shape, videos, _cache["mid"], _cache["name"])
+
+
+def page(shape, sw, sh):
+    return landing_page(shape, logged_in=bool(_cache["cookies"]), mid=_cache["mid"], name=_cache["name"])
+
+
+def handle(action, params, shape=None, sw=0, sh=0):
+    print(f"[HydroBili] handle action={action} params={list(params.keys()) if isinstance(params, dict) else 'N/A'}", flush=True)
+    client_store = {}
+
+    if isinstance(params, dict):
+        raw = params.get("_store")
+        if isinstance(raw, dict):
+            client_store = raw
+        elif isinstance(raw, str):
+            import json
+            try:
+                client_store = json.loads(raw)
+            except Exception:
+                pass
+    _restore(client_store)
+
+    # 验证/恢复会话
+    if action == "verify":
+        if _cache["cookies"]:
+            mid, name = verify_cookies(_cache["cookies"])
+            if mid:
+                _cache["mid"] = mid
+                _cache["name"] = name
+                return _build_home(shape).to_dict()
+            _cache["cookies"] = {}
+        return landing_page(shape).to_dict()
+
+    # 刷新首页视频推荐
+    elif action == "refresh":
+        if _cache["cookies"]:
+            mid, name = verify_cookies(_cache["cookies"])
+            if mid:
+                _cache["mid"] = mid
+                _cache["name"] = name
+                return _build_home(shape).to_dict()
+        return {"toast": "登录已失效"}
+
+    # Tab 切换页
+    elif action == "tabs":
+        return tabs_page(shape).to_dict()
+
+    # 首页
+    elif action == "home":
+        if _cache["cookies"]:
+            return _build_home(shape).to_dict()
+        return {"toast": "未登录"}
+
+    # 我的
+    elif action == "mine":
+        if _cache["cookies"]:
+            return mine_page(shape, _cache["mid"], _cache["name"]).to_dict()
+        return {"toast": "未登录"}
+
+    # 生成二维码
+    elif action == "generate":
+        result = do_generate(shape)
+        if isinstance(result, dict) and "_qrcode_key" in result:
+            _cache["qrcode_key"] = result.pop("_qrcode_key")
+        return result
+
+    # 取消扫码
+    elif action == "cancel":
+        _cache["qrcode_key"] = ""
+        if _cache["cookies"]:
+            return _build_home(shape).to_dict()
+        return landing_page(shape).to_dict()
+
+    # 轮询扫码（由 tick 触发）
+    elif action == "tick":
+        key = _cache.get("qrcode_key")
+        if not key:
+            return {"toast": ""}
+        result = do_poll(shape, key)
+        store = result.get("_store", {})
+        if store.get("bili_cookies"):
+            _cache["cookies"] = store["bili_cookies"]
+            _cache["mid"] = result.get("_mid") or 0
+            _cache["name"] = result.get("_name") or ""
+            _cache["qrcode_key"] = ""
+            r = _build_home(shape).to_dict()
+            r["_store"] = store
+            r["toast"] = "登录成功"
+            return r
+        return result
+
+    # 退出
+    elif action == "logout":
+        _cache["cookies"] = {}
+        _cache["mid"] = 0
+        _cache["name"] = ""
+        _cache["qrcode_key"] = ""
+        result = landing_page(shape).to_dict()
+        result["_clearStore"] = ["bili_cookies"]
+        return result
+
+    return {"toast": f"未知操作: {action}"}

@@ -1,0 +1,11 @@
+{
+  "manifestVersion": 1,
+  "package": {
+    "id": "com.hydro.bili",
+    "name": "HydroBili",
+    "displayName": "HydroBili",
+    "version": "1.0.0",
+    "versionCode": 1
+  },
+  "minAPILevel": 6
+}
