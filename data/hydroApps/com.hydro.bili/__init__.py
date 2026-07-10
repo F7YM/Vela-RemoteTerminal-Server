@@ -89,6 +89,10 @@ def handle(action, params, shape=None, sw=0, sh=0):
     elif action == "tabs":
         return tabs_page(shape).to_dict()
 
+    # 关闭 HydroApp
+    elif action == "exit":
+        return {"exit": True}
+
     # 首页（从详情页返回时命中此 action，使用缓存不刷新）
     elif action == "home":
         if _cache["cookies"]:

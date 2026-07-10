@@ -67,6 +67,7 @@ def tabs_page(shape):
         Text("切换页面", fs=28, clr="#ffffff", fw="bold", mt=10),
         Button("  首页  ", action="home", bg="#2196F3", w=220, h=48, br=24, mt=20, fs=22),
         Button("  我的  ", action="mine", bg="#555555", w=220, h=48, br=24, mt=14, fs=22),
+        Button("  关闭  ", action="exit", bg="#f44336", w=220, h=48, br=24, mt=14, fs=22),
         content_style=safe_area_style(shape),
     )
 
