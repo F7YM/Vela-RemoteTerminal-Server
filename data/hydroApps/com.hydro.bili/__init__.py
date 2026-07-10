@@ -1,6 +1,6 @@
 """HydroBili — Bilibili 扫码登录"""
 
-from .api import verify_cookies, fetch_popular
+from .api import verify_cookies, fetch_popular, fetch_user_card
 from .pages import landing_page, home_page, tabs_page, mine_page
 from .login import do_generate, do_poll
 
@@ -27,6 +27,17 @@ def _build_home(shape):
     """获取推荐视频并构建首页"""
     videos = fetch_popular(_cache["cookies"]) if _cache["cookies"] else []
     return home_page(shape, videos, _cache["mid"], _cache["name"])
+
+
+def _build_mine(shape):
+    """获取用户名片并构建我的页面"""
+    face, name = "", _cache["name"]
+    if _cache["cookies"]:
+        card = fetch_user_card(_cache["mid"], _cache["cookies"])
+        face = card.get("face", "")
+        if card.get("name"):
+            name = card["name"]
+    return mine_page(shape, face, name)
 
 
 def page(shape, sw, sh):
@@ -83,7 +94,7 @@ def handle(action, params, shape=None, sw=0, sh=0):
     # 我的
     elif action == "mine":
         if _cache["cookies"]:
-            return mine_page(shape, _cache["mid"], _cache["name"]).to_dict()
+            return _build_mine(shape).to_dict()
         return {"toast": "未登录"}
 
     # 生成二维码

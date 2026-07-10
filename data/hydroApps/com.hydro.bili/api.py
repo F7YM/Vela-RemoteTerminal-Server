@@ -96,3 +96,31 @@ def verify_cookies(cookies: dict) -> tuple:
     except Exception:
         pass
     return 0, ""
+
+
+BILI_CARD = "https://api.bilibili.com/x/web-interface/card"
+
+
+def fetch_user_card(mid: int, cookies: dict) -> dict:
+    """获取用户名片信息，返回 {face, name} 或 {}"""
+    try:
+        resp = _get(BILI_CARD, params={"mid": mid}, cookies=cookies)
+        data = resp.json()
+        if data.get("code") == 0:
+            card = data.get("data", {}).get("card", {})
+            return {"face": card.get("face", ""), "name": card.get("name", "")}
+    except Exception:
+        pass
+    return {}
+    """验证 cookie，返回 (mid, uname) 或 (0, '')"""
+    if not cookies:
+        return 0, ""
+    try:
+        resp = _get(BILI_NAV, cookies=cookies)
+        data = resp.json()
+        if data.get("code") == 0 and data.get("data", {}).get("isLogin"):
+            info = data["data"]
+            return info.get("mid", 0), info.get("uname", "")
+    except Exception:
+        pass
+    return 0, ""

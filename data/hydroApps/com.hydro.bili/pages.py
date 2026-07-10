@@ -1,7 +1,7 @@
 """UI 页面构建"""
 
 import urllib.parse
-from hydroApp import Page, Text, Button, Image, safe_area_style
+from hydroApp import Page, Text, Button, Image, Row, safe_area_style
 
 _base_url = ""
 
@@ -57,16 +57,21 @@ def tabs_page(shape):
     )
 
 
-def mine_page(shape, mid, name):
-    """我的页面：用户信息 + 退出"""
-    return Page(
+def mine_page(shape, face, name):
+    """我的页面：头像 + 昵称横向并列"""
+    items = [
         Button("我的", action="tabs", bg="transparent", h=34, mt=6, fs=26, fw="bold"),
-        Text("已登录", fs=26, clr="#4CAF50", fw="bold", mt=12),
-        Text(f"UID: {mid}", fs=18, clr="#ffffff", mt=6),
-        Text(name, fs=20, clr="#ffffff", mt=4),
-        Button("退出登录", action="logout", bg="#f44336", w=220, h=48, br=24, mt=24, fs=18),
-        content_style=safe_area_style(shape),
-    )
+    ]
+    if face:
+        items.append(Row(
+            Image(src=face, w=48, h=48, br=24),
+            Text(name, fs=20, clr="#ffffff", ml=12),
+            props={"ai": "center", "jc": "flex-start"},
+        ))
+    else:
+        items.append(Text(name, fs=20, clr="#ffffff", mt=4))
+    items.append(Button("退出登录", action="logout", bg="#f44336", w=220, h=48, br=24, mt=24, fs=18))
+    return Page(*items, content_style=safe_area_style(shape))
 
 
 def qr_scan(shape, url, status="等待扫码..."):
