@@ -55,7 +55,7 @@ def home_page(shape, videos, mid, name):
             )
             if pic:
                 items.append(Row(
-                    Image(src=pic + "@160w_100h", w=160, h=100, br=8),
+                    Image(src=pic + "@160w_100h", w=160, h=100, br=8, of="cover"),
                     info_col,
                     props={"jc": "flex-start", "ai": "flex-start"},
                 ))
