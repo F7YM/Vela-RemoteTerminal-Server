@@ -3,6 +3,8 @@ import sys
 import json
 import importlib.util
 import zipfile
+import tempfile
+import shutil
 
 APPS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'hydroApps')
 
@@ -62,25 +64,37 @@ def load_module(name: str):
 
 def install(zip_path: str) -> str | None:
     try:
+        tmp = tempfile.mkdtemp()
         with zipfile.ZipFile(zip_path, 'r') as zf:
-            top = zf.namelist()[0].split('/')[0]
-            if not os.path.isdir(APPS_DIR):
-                os.makedirs(APPS_DIR)
-            for member in zf.namelist():
-                if member.endswith('/'):
-                    os.makedirs(os.path.join(APPS_DIR, member), exist_ok=True)
-                else:
-                    os.makedirs(os.path.join(APPS_DIR, os.path.dirname(member)), exist_ok=True)
-                    zf.extract(member, APPS_DIR)
-            if not os.path.isfile(os.path.join(APPS_DIR, top, '__init__.py')):
-                return None
-            return top
+            zf.extractall(tmp)
+        # 找到含 __init__.py 的应用目录
+        items = os.listdir(tmp)
+        app_dir = None
+        for item in items:
+            candidate = os.path.join(tmp, item)
+            if os.path.isdir(candidate) and os.path.isfile(os.path.join(candidate, '__init__.py')):
+                app_dir = candidate
+                break
+        if not app_dir:
+            shutil.rmtree(tmp)
+            return None
+        # 读取 manifest.json 中的 package.name 作为目录名
+        manifest = _read_manifest(app_dir)
+        pkg = manifest.get("package", {})
+        target_name = pkg.get("name") or os.path.basename(app_dir)
+        target_path = os.path.join(APPS_DIR, target_name)
+        # 如果目标已存在则删除
+        if os.path.isdir(target_path):
+            shutil.rmtree(target_path)
+        os.makedirs(APPS_DIR, exist_ok=True)
+        shutil.move(app_dir, target_path)
+        shutil.rmtree(tmp)
+        return target_name
     except Exception:
         return None
 
 
 def uninstall(name: str) -> bool:
-    import shutil
     d = os.path.join(APPS_DIR, name)
     if not os.path.isdir(d):
         return False
