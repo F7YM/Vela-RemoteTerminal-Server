@@ -45,9 +45,9 @@ def _build_mine(shape):
 
 
 def page(shape, sw, sh, store=None):
-    if store:
-        _restore(store)
-    return landing_page(shape, logged_in=bool(_cache["cookies"]), mid=_cache["mid"], name=_cache["name"])
+    if not store or not store.get("bili_cookies"):
+        return landing_page(shape, logged_in=False)
+    return splash_page(shape)
 
 
 def handle(action, params, shape=None, sw=0, sh=0):

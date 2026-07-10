@@ -18,6 +18,13 @@ def _format_num(n: int) -> str:
     return str(n)
 
 
+def splash_page(shape):
+    return Page(
+        Image(src=_icon("home"), w=120, h=120),
+        content_style=safe_area_style(shape) + "; justify-content: center; align-items: center",
+    )
+
+
 def landing_page(shape, logged_in=False, mid=0, name=""):
     """未登录时的落地页 / 已登录则跳转到首页"""
     if logged_in:
