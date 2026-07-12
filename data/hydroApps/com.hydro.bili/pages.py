@@ -44,7 +44,8 @@ _IconData = {
 }
 
 def _icon(name: str) -> str:
-    return '/hydro-icons/com.hydro.bili/' + _IconData[name]
+    base = _base_url or ''
+    return base + '/hydro-icons/com.hydro.bili/' + _IconData[name]
 
 
 def home_page(shape, videos, mid, name):
