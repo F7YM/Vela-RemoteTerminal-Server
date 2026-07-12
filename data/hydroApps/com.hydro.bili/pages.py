@@ -7,9 +7,7 @@ _base_url = ""
 
 
 def _qr_img_src(url: str) -> str:
-    if _base_url:
-        return _base_url + '/api/hydro/qr_image?data=' + urllib.parse.quote(url)
-    return 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + urllib.parse.quote(url)
+    return '/api/hydro/qr_image?data=' + urllib.parse.quote(url)
 
 
 def _format_num(n: int) -> str:
