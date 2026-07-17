@@ -49,6 +49,17 @@ def validate_manifest(manifest: dict) -> tuple:
     return {}
 
 
+def _safe_icon_check(app_dir: str, icon_rel: str) -> bool:
+    """校验 icon 位于 app 的 icons/ 子目录"""
+    if '..' in icon_rel:
+        return False
+    full = os.path.join(app_dir, icon_rel)
+    icons_dir = os.path.join(app_dir, 'icons')
+    if not os.path.isfile(full):
+        return False
+    return os.path.abspath(full).startswith(os.path.abspath(icons_dir) + os.sep)
+
+
 def list_apps() -> list[dict]:
     if not os.path.isdir(APPS_DIR):
         return []
@@ -59,11 +70,16 @@ def list_apps() -> list[dict]:
             continue
         m = _read_manifest(d)
         pk = m.get("package", {})
+        icon_url = ""
+        pk_id = pk.get("id", "")
+        if m.get("icon") and pk_id and _safe_icon_check(d, m["icon"]):
+            icon_url = f"/api/hydro/app_icon/{pk_id}/{m['icon']}"
         result.append({
             "name": name,
             "displayName": pk.get("displayName", name),
-            "id": pk.get("id", ""),
+            "id": pk_id,
             "version": pk.get("version", ""),
+            "icon": icon_url,
             "path": d,
         })
     return result

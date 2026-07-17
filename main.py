@@ -1996,6 +1996,50 @@ def hydro_qr_image():
         return str(e), 500
 
 
+def _serve_circular_icon(image_path: str):
+    """裁剪为圆形并缩放至固定 128x128（带缓存）"""
+    from io import BytesIO
+    from PIL import Image, ImageDraw
+    cache_path = image_path + '.circular.png'
+    if os.path.isfile(cache_path):
+        return send_file(cache_path, mimetype='image/png')
+    img = Image.open(image_path).convert('RGBA')
+    size = min(img.size)
+    left = (img.width - size) // 2
+    top = (img.height - size) // 2
+    img = img.crop((left, top, left + size, top + size))
+    mask = Image.new('L', (size, size), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0, size, size), fill=255)
+    output = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    output.paste(img, (0, 0), mask)
+    output = output.resize((128, 128), Image.LANCZOS)
+    output.save(cache_path, format='PNG')
+    buf = BytesIO()
+    output.save(buf, format='PNG')
+    buf.seek(0)
+    return send_file(buf, mimetype='image/png')
+
+
+@flask_app.route('/api/hydro/app_icon/<app_id>/<path:filename>')
+def hydro_app_icon(app_id, filename):
+    """提供应用图标（自动圆形裁剪）"""
+    from werkzeug.utils import safe_join
+    if not re.match(r'^[a-zA-Z0-9_\-\.]+$', app_id):
+        return 'invalid', 400
+    app_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'hydroApps', app_id)
+    if not os.path.isdir(app_dir):
+        return 'not found', 404
+    file_path = safe_join(app_dir, filename)
+    if not file_path or not os.path.isfile(file_path):
+        return 'not found', 404
+    # 额外校验：必须位于 icons/ 子目录内
+    icons_dir = os.path.join(app_dir, 'icons')
+    if not os.path.abspath(file_path).startswith(os.path.abspath(icons_dir) + os.sep):
+        return 'forbidden', 403
+    return _serve_circular_icon(file_path)
+
+
 @flask_app.route('/hydro-icons/<app_id>/<path:filename>')
 def hydro_icon(app_id, filename):
     import os

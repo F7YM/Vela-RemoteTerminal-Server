@@ -58,6 +58,7 @@ def handle(action, params, shape=None, sw=0, sh=0):
     "version": "1.0.0",
     "versionCode": 1
   },
+  "icon": "icons/app_icon.png",
   "minAPILevel": 6
 }
 ```
@@ -348,6 +349,8 @@ def handle(action, params, shape=None, sw=0, sh=0):
 server/data/hydroApps/MyApp/
 ├── __init__.py      ← 必须：page() + handle()
 ├── manifest.json    ← 推荐：元数据
+├── icons/           ← 推荐：图标目录
+│   └── app_icon.png ← 应用图标（自动裁剪为圆形）
 ├── utils.py         ← 可选：工具函数
 ```
 
@@ -363,6 +366,7 @@ server/data/hydroApps/MyApp/
     "version": "1.0.0",
     "versionCode": 1
   },
+  "icon": "icons/app_icon.png",
   "minAPILevel": 6
 }
 ```
@@ -374,7 +378,15 @@ server/data/hydroApps/MyApp/
 | `package.displayName` | 启动器中显示的名称 |
 | `package.version` | 版本号（字符串），如 `"1.0.0"` |
 | `package.versionCode` | 版本号（整数），用于比较新旧 |
+| `icon` | 应用图标路径（相对于 manifest.json），**必须**位于 `icons/` 子目录下。服务端自动裁剪为圆形 128×128 PNG |
 | `minAPILevel` | 最低 API 等级，当前为 6 |
+
+### icon 约束
+
+- 图标文件**必须**放在 app 内的 `icons/` 子目录（如 `icons/app_icon.png`）
+- manifest 中写相对路径 `"icon": "icons/app_icon.png"`
+- 服务端校验文件确实在 `icons/` 内，越界访问返回 403
+- 启动器通过 `GET /api/hydro/app_icon/<package.id>/<path:icon>` 获取（自动圆形裁剪、固定 128×128）
 
 ## 服务端 API（总览）
 
@@ -384,6 +396,7 @@ server/data/hydroApps/MyApp/
 | `/api/hydro/activate` | POST | 激活应用（body: `{name}`） |
 | `/api/hydro/page` | GET | 获取当前页面（query: `shape,sw,sh`） |
 | `/api/hydro/action` | POST | 执行操作（body: `{action, params, shape, sw, sh}`） |
+| `/api/hydro/app_icon/<id>/<path>` | GET | 获取应用图标（自动圆形裁剪，仅 `icons/` 目录） |
 
 ## 客户端组件映射
 
