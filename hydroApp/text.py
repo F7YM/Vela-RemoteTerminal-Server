@@ -10,6 +10,4 @@ class Text(UIComponent):
     def to_dict(self) -> dict:
         item = super().to_dict()
         item["v"] = self.value
-        if self.props.get("lines"):
-            item["lines"] = self.props["lines"]
         return item
