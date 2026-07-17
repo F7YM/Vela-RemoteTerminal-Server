@@ -2091,12 +2091,14 @@ def hydro_audio_stream(bvid):
         if not resp.ok:
             return jsonify({"error": f"B站音频源返回 {resp.status_code}"}), 502
 
+        content_type = resp.headers.get('Content-Type', 'audio/mp4')
+
         def generate():
             for chunk in resp.iter_content(chunk_size=65536):
                 if chunk:
                     yield chunk
 
-        return _Response(generate(), mimetype="audio/mp4",
+        return _Response(generate(), mimetype=content_type,
                          headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
     except Exception as e:
         import traceback
