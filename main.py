@@ -2073,33 +2073,73 @@ def hydro_audio_info(bvid):
         return jsonify({"error": str(e)}), 500
 
 
+_audio_url_cache = {}
+
+
+def _get_cached_audio_url(bvid):
+    """获取缓存的音频 URL，避免重复调用 Wbi API"""
+    import time
+    cached = _audio_url_cache.get(bvid)
+    if cached and time.time() - cached[0] < 600:
+        return cached[1]
+    from hydroApp.loader import _ensure_parent_packages
+    _ensure_parent_packages('com.hydro.bili')
+    import sys
+    if 'com.hydro.bili' not in sys.modules:
+        from hydroApp.loader import load_module
+        load_module('com.hydro.bili')
+    from com.hydro.bili.api import fetch_dash_audio_url
+    audio_url = fetch_dash_audio_url(bvid)
+    if audio_url:
+        _audio_url_cache[bvid] = (time.time(), audio_url)
+    return audio_url
+
+
 @flask_app.route('/api/hydro/audio/stream/<bvid>')
+@flask_app.route('/api/hydro/audio/stream/<bvid>.m4a')
 def hydro_audio_stream(bvid):
-    """代理 Bilibili DASH 纯音频流，零转码直接透传"""
+    """代理 Bilibili DASH 纯音频流，完整支持 HTTP Range"""
     try:
-        from flask import Response as _Response
+        from flask import Response as _Response, request as _request
+        audio_url = _get_cached_audio_url(bvid)
+        if not audio_url:
+            return jsonify({"error": "获取音频流失败"}), 404
+
+        req_range = _request.headers.get('Range')
+        kwargs = {"stream": True, "timeout": 30}
+        if req_range:
+            kwargs["headers"] = {"Range": req_range}
+
+        from hydroApp.loader import _ensure_parent_packages
+        _ensure_parent_packages('com.hydro.bili')
         import sys
         if 'com.hydro.bili' not in sys.modules:
             from hydroApp.loader import load_module
             load_module('com.hydro.bili')
-        from com.hydro.bili.api import fetch_dash_audio_url
         from com.hydro.bili.api import _get as bili_get
-        audio_url = fetch_dash_audio_url(bvid)
-        if not audio_url:
-            return jsonify({"error": "获取音频流失败"}), 404
-        resp = bili_get(audio_url, stream=True, timeout=30)
-        if not resp.ok:
+
+        resp = bili_get(audio_url, **kwargs)
+        if resp.status_code not in (200, 206):
             return jsonify({"error": f"B站音频源返回 {resp.status_code}"}), 502
 
         content_type = resp.headers.get('Content-Type', 'audio/mp4')
+        resp_headers = {"Accept-Ranges": "bytes"}
+        if resp.headers.get("Content-Length"):
+            resp_headers["Content-Length"] = resp.headers["Content-Length"]
+        if resp.headers.get("Content-Range"):
+            resp_headers["Content-Range"] = resp.headers["Content-Range"]
+        if resp.headers.get("ETag"):
+            resp_headers["ETag"] = resp.headers["ETag"]
+        if resp.headers.get("Last-Modified"):
+            resp_headers["Last-Modified"] = resp.headers["Last-Modified"]
 
         def generate():
             for chunk in resp.iter_content(chunk_size=65536):
                 if chunk:
                     yield chunk
 
-        return _Response(generate(), mimetype=content_type,
-                         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
+        return _Response(generate(), status=resp.status_code, mimetype=content_type,
+                         headers=resp_headers)
     except Exception as e:
         import traceback
         traceback.print_exc()
