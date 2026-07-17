@@ -19,4 +19,6 @@ class Button(UIComponent):
             item["a"] = self.action
         if self.props.get("fw"):
             item["fw"] = self.props["fw"]
+        if self.props.get("data"):
+            item["data"] = self.props["data"]
         return item
