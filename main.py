@@ -566,6 +566,9 @@ def require_trusted(f):
     from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
+        # Debug 模式：允许未授权设备
+        if load_config().get("debug_allow_untrusted", False):
+            return f(*args, **kwargs)
         device_id = request.headers.get('X-Device-ID')
         if not device_id:
             return jsonify({"status": "error", "message": "Missing device ID"}), 401
@@ -1959,7 +1962,7 @@ def _deactivate_app():
 @require_trusted
 def hydro_list():
     apps = list_apps()
-    return jsonify({"apps": [{"name": a["name"], "displayName": a.get("displayName", a["name"]), "id": a.get("id", ""), "version": a.get("version", "")} for a in apps]})
+    return jsonify({"apps": [{"name": a["name"], "displayName": a.get("displayName", a["name"]), "id": a.get("id", ""), "version": a.get("version", ""), "icon": a.get("icon", "")} for a in apps]})
 
 
 @flask_app.route('/api/hydro/activate', methods=['POST'])
@@ -2724,6 +2727,42 @@ def main(page: ft.Page):
         scale=0.8
     )
 
+    # Debug 开关
+    def on_debug_toggle(e):
+        if e.control.value:
+            def on_confirm(_):
+                dialog.open = False
+                config["debug_allow_untrusted"] = True
+                save_config(config)
+                page.update()
+            def on_cancel(_):
+                dialog.open = False
+                e.control.value = False
+                page.update()
+            dialog = ft.AlertDialog(
+                modal=True,
+                title=ft.Text("⚠️ Debug 警告"),
+                content=ft.Text("开启后所有设备无需配对即可访问服务端 API，存在安全风险！\n\n仅建议在调试时使用。"),
+                actions=[
+                    ft.TextButton("取消", on_click=on_cancel),
+                    ft.TextButton("确认开启", on_click=on_confirm),
+                ]
+            )
+            page.overlay.append(dialog)
+            dialog.open = True
+            page.update()
+        else:
+            config["debug_allow_untrusted"] = False
+            save_config(config)
+            page.update()
+
+    debug_switch = ft.Switch(
+        value=config.get("debug_allow_untrusted", False),
+        on_change=on_debug_toggle,
+        active_color=ft.Colors.ORANGE_400,
+        scale=0.8
+    )
+
     # 关于区域
     about_section = ft.Container(
         content=ft.Column([
@@ -2766,6 +2805,10 @@ def main(page: ft.Page):
             ft.Text("开启后 Vela 设备可通过 SSH 控制本机终端", size=11, color=ft.Colors.GREY_400),
             ft.Row([ft.Container(expand=True), ssh_switch]),
             ssh_user_row,
+            ft.Divider(height=1, color=ft.Colors.GREY_800),
+            ft.Text("Debug: 允许来自未授权设备的请求", size=14, color=ft.Colors.ORANGE_400),
+            ft.Text("开启后所有设备无需配对即可访问 API", size=11, color=ft.Colors.GREY_400),
+            ft.Row([ft.Container(expand=True), debug_switch]),
         ], spacing=8, scroll=ft.ScrollMode.AUTO),
         padding=10,
         expand=True
