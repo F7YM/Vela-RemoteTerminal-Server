@@ -23,4 +23,6 @@ class Button(UIComponent):
             item["data"] = self.props["data"]
         if self.props.get("img_size"):
             item["img_size"] = self.props["img_size"]
+        if self.props.get("of"):
+            item["of"] = self.props["of"]
         return item
