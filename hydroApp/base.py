@@ -4,6 +4,7 @@ STYLE_MAP = {
     "pt": "padding-top", "pb": "padding-bottom", "pl": "padding-left", "pr": "padding-right",
     "w": "width", "h": "height", "bg": "background-color", "br": "border-radius",
     "jc": "justify-content", "ai": "align-items", "of": "object-fit",
+    "to": "text-overflow",
 }
 SIZE_PROPS = {"fs", "mt", "mb", "ml", "mr", "pt", "pb", "pl", "pr", "w", "h", "br"}
 
