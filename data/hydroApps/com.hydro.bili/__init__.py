@@ -9,6 +9,7 @@ _cache = {
     "mid": 0,
     "name": "",
     "qrcode_key": "",
+    "qrcode_url": "",
     "videos": [],
 }
 
@@ -129,11 +130,13 @@ def handle(action, params, shape=None, sw=0, sh=0):
         result = do_generate(shape)
         if isinstance(result, dict) and "_qrcode_key" in result:
             _cache["qrcode_key"] = result.pop("_qrcode_key")
+            _cache["qrcode_url"] = result.pop("_qrcode_url", "")
         return result
 
     # 取消扫码
     elif action == "cancel":
         _cache["qrcode_key"] = ""
+        _cache["qrcode_url"] = ""
         if _cache["cookies"]:
             return _build_home(shape).to_dict()
         return landing_page(shape).to_dict()
@@ -143,7 +146,7 @@ def handle(action, params, shape=None, sw=0, sh=0):
         key = _cache.get("qrcode_key")
         if not key:
             return {"toast": ""}
-        result = do_poll(shape, key)
+        result = do_poll(shape, key, _cache.get("qrcode_url", ""))
         store = result.get("_store", {})
         if store.get("bili_cookies"):
             _cache["cookies"] = store["bili_cookies"]
@@ -162,6 +165,7 @@ def handle(action, params, shape=None, sw=0, sh=0):
         _cache["mid"] = 0
         _cache["name"] = ""
         _cache["qrcode_key"] = ""
+        _cache["qrcode_url"] = ""
         result = landing_page(shape).to_dict()
         result["_clearStore"] = ["bili_cookies"]
         return result

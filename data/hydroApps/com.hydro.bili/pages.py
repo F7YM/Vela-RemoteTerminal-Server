@@ -1,13 +1,8 @@
 """UI 页面构建"""
 
-import urllib.parse
-from hydroApp import Page, Text, Button, Image, Row, Column, safe_area_style
+from hydroApp import Page, Text, Button, Image, QRCode, Row, Column, safe_area_style
 
 _base_url = ""
-
-
-def _qr_img_src(url: str) -> str:
-    return '/api/hydro/qr_image?data=' + urllib.parse.quote(url)
 
 
 def _format_num(n: int) -> str:
@@ -158,7 +153,7 @@ def qr_scan(shape, url, status="等待扫码..."):
     return Page(
         Button("取消", action="cancel", bg="#555555", w=120, h=40, br=20, fs=16),
         Text("请使用 Bilibili App 扫码", fs=18, clr="#ffffff", mt=10),
-        Image(src=_qr_img_src(url), w=200, h=200, br=12, mt=10),
+        QRCode(data=url, w=200, h=200, mt=10),
         Text(status, fs=16, clr=color, mt=10),
         content_style=safe_area_style(shape),
     )

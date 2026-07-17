@@ -17,23 +17,24 @@ def do_generate(shape):
     print(f"[HydroBili] qr_scan dict keys={list(result.keys())}", flush=True)
     result["tick"] = 2000
     result["_qrcode_key"] = d["qrcode_key"]
+    result["_qrcode_url"] = d["url"]
     return result
 
 
-def do_poll(shape, qrcode_key):
+def do_poll(shape, qrcode_key, qrcode_url=""):
     """轮询扫码状态"""
     data = poll_qr(qrcode_key)
     code = data.get("code", -1)
     print(f"[HydroBili] poll code={code}", flush=True)
 
     if code == 86101:
-        obj = qr_scan(shape, f"https://passport.bilibili.com/h5-app/passport/login/scan?navhide=1&qrcode_key={qrcode_key}")
-        result = obj.to_dict()
-        result["tick"] = 2000
-        return result
+        # 二维码未扫描，无需刷新 UI，继续轮询
+        return {"tick": 2000}
 
     if code == 86090:
-        obj = qr_scan(shape, f"https://passport.bilibili.com/h5-app/passport/login/scan?navhide=1&qrcode_key={qrcode_key}", "请在手机上确认登录")
+        # 已扫描，等待确认，更新状态文本（保持原 QR URL 不变）
+        url = qrcode_url or f"https://passport.bilibili.com/h5-app/passport/login/scan?navhide=1&qrcode_key={qrcode_key}"
+        obj = qr_scan(shape, url, "请在手机上确认登录")
         result = obj.to_dict()
         result["tick"] = 2000
         return result
