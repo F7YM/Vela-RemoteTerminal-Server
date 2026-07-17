@@ -17,4 +17,6 @@ class Button(UIComponent):
             item["img"] = self.image
         if self.action:
             item["a"] = self.action
+        if self.props.get("fw"):
+            item["fw"] = self.props["fw"]
         return item
