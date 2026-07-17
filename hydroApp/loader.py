@@ -92,6 +92,17 @@ def get_app_path(name: str) -> str | None:
     return None
 
 
+def _ensure_parent_packages(name: str):
+    """Ensure all parent packages exist in sys.modules for a dotted module name."""
+    parts = name.split('.')
+    for i in range(1, len(parts)):
+        parent = '.'.join(parts[:i])
+        if parent not in sys.modules:
+            pkg = type(sys)(parent)
+            pkg.__path__ = []
+            sys.modules[parent] = pkg
+
+
 def load_module(name: str):
     path = get_app_path(name)
     if not path:
@@ -100,6 +111,7 @@ def load_module(name: str):
     for mod_name in list(sys.modules.keys()):
         if mod_name == name or mod_name.startswith(name + '.'):
             del sys.modules[mod_name]
+    _ensure_parent_packages(name)
     spec = importlib.util.spec_from_file_location(name, os.path.join(path, '__init__.py'))
     if not spec or not spec.loader:
         return None

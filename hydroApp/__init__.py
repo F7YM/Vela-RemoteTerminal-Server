@@ -1,5 +1,5 @@
 from .base import UIComponent, Container, build_style
-from .text import Text
+from .text import Text, ProgressText
 from .button import Button
 from .image import Image
 from .qrcode import QRCode

@@ -10,10 +10,13 @@ def safe_area_style(shape: str = "") -> str:
 
 
 class Page:
-    def __init__(self, *children, refresh_interval: int = 0, content_style: str = ""):
+    def __init__(self, *children, refresh_interval: int = 0, content_style: str = "",
+                 audio: dict | None = None, audio_cmd: str = ""):
         self.children = list(children)
         self.refresh_interval = refresh_interval
         self.content_style = content_style
+        self.audio = audio
+        self.audio_cmd = audio_cmd
 
     def to_json(self) -> str:
         import json
@@ -26,4 +29,8 @@ class Page:
         }
         if self.content_style:
             d["cs"] = self.content_style
+        if self.audio:
+            d["audio"] = self.audio
+        if self.audio_cmd:
+            d["audioCmd"] = self.audio_cmd
         return d

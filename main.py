@@ -2057,6 +2057,49 @@ def hydro_icon(app_id, filename):
     return 'not found', 404
 
 
+# ============ HydroBili 音频流代理 ============
+
+@flask_app.route('/api/hydro/audio/info/<bvid>')
+@require_trusted
+def hydro_audio_info(bvid):
+    """返回音频元数据（标题、封面、作者、时长）"""
+    try:
+        from data.hydroApps.com.hydro.bili.api import fetch_audio_meta
+        meta = fetch_audio_meta(bvid)
+        if not meta:
+            return jsonify({"error": "获取视频信息失败"}), 404
+        return jsonify(meta)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route('/api/hydro/audio/stream/<bvid>')
+@require_trusted
+def hydro_audio_stream(bvid):
+    """代理 Bilibili DASH 纯音频流，零转码直接透传"""
+    try:
+        from data.hydroApps.com.hydro.bili.api import fetch_dash_audio_url
+        from data.hydroApps.com.hydro.bili.api import _get as bili_get
+        audio_url = fetch_dash_audio_url(bvid)
+        if not audio_url:
+            return jsonify({"error": "获取音频流失败"}), 404
+        resp = bili_get(audio_url, stream=True, timeout=30)
+        if not resp.ok:
+            return jsonify({"error": f"B站音频源返回 {resp.status_code}"}), 502
+
+        def generate():
+            for chunk in resp.iter_content(chunk_size=65536):
+                if chunk:
+                    yield chunk
+
+        return Response(generate(), mimetype="audio/mp4",
+                        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 # ============ 系统信息函数 ============
 
 def get_system_info():
