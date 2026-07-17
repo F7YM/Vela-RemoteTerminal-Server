@@ -2077,8 +2077,12 @@ def hydro_audio_info(bvid):
 def hydro_audio_stream(bvid):
     """代理 Bilibili DASH 纯音频流，零转码直接透传"""
     try:
-        from data.hydroApps.com.hydro.bili.api import fetch_dash_audio_url
-        from data.hydroApps.com.hydro.bili.api import _get as bili_get
+        import sys
+        if 'com.hydro.bili' not in sys.modules:
+            from hydroApp.loader import load_module
+            load_module('com.hydro.bili')
+        from com.hydro.bili.api import fetch_dash_audio_url
+        from com.hydro.bili.api import _get as bili_get
         audio_url = fetch_dash_audio_url(bvid)
         if not audio_url:
             return jsonify({"error": "获取音频流失败"}), 404
