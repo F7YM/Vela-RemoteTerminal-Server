@@ -2077,6 +2077,7 @@ def hydro_audio_info(bvid):
 def hydro_audio_stream(bvid):
     """代理 Bilibili DASH 纯音频流，零转码直接透传"""
     try:
+        from flask import Response as _Response
         import sys
         if 'com.hydro.bili' not in sys.modules:
             from hydroApp.loader import load_module
@@ -2095,8 +2096,8 @@ def hydro_audio_stream(bvid):
                 if chunk:
                     yield chunk
 
-        return Response(generate(), mimetype="audio/mp4",
-                        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
+        return _Response(generate(), mimetype="audio/mp4",
+                         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
     except Exception as e:
         import traceback
         traceback.print_exc()
