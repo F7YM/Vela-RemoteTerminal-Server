@@ -2074,7 +2074,6 @@ def hydro_audio_info(bvid):
 
 
 @flask_app.route('/api/hydro/audio/stream/<bvid>')
-@require_trusted
 def hydro_audio_stream(bvid):
     """代理 Bilibili DASH 纯音频流，零转码直接透传"""
     try:
