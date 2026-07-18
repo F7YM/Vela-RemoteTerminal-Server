@@ -19,7 +19,6 @@ hiddenimports += [
     'nacl',
     'asyncio',
     'pyautogui',
-    'requests',
     'hydroApp',
 ]
 if sys.platform == 'win32':
