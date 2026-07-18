@@ -6,7 +6,12 @@ import zipfile
 import tempfile
 import shutil
 
-APPS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'hydroApps')
+if getattr(sys, 'frozen', False):
+    _base = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    _base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+APPS_DIR = os.path.join(_base, 'data', 'hydroApps')
 # 客户端最低 API 等级（与客户端 manifest.json 的 minAPILevel 保持一致）
 CLIENT_MIN_API_LEVEL = 2
 
