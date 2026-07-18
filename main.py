@@ -1961,7 +1961,9 @@ def _deactivate_app():
 @flask_app.route('/api/hydro/list', methods=['GET'])
 @require_trusted
 def hydro_list():
+    print(f'[hydro_list] device_id={request.headers.get("X-Device-ID")}, remote={request.remote_addr}', flush=True)
     apps = list_apps()
+    print(f'[hydro_list] found {len(apps)} apps', flush=True)
     return jsonify({"apps": [{"name": a["name"], "displayName": a.get("displayName", a["name"]), "id": a.get("id", ""), "version": a.get("version", ""), "icon": a.get("icon", "")} for a in apps]})
 
 
