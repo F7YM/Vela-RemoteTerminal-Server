@@ -2106,7 +2106,7 @@ def hydro_audio_stream(bvid):
             return jsonify({"error": "获取音频流失败"}), 404
 
         req_range = _request.headers.get('Range')
-        kwargs = {"stream": True, "timeout": 30}
+        kwargs = {"stream": True, "timeout": 30, "verify": False}
         if req_range:
             kwargs["headers"] = {"Range": req_range}
 

@@ -17,9 +17,10 @@ hiddenimports += [
     'cryptography',
     'bcrypt',
     'nacl',
-    'invoke',
     'asyncio',
     'pyautogui',
+    'requests',
+    'hydroApp',
 ]
 if sys.platform == 'win32':
     hiddenimports.append('winsdk')
@@ -33,7 +34,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tkinter', 'unittest', 'pydoc'],
+    excludes=['unittest', 'pydoc'],
     noarchive=False,
     optimize=0,
 )
