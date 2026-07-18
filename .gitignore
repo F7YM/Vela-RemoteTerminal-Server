@@ -12,4 +12,6 @@ data/
 rpm/
 .vscode/
 data/hydroApps/**/__pycache__
-*.ico
+app.ico
+RemoteTerminal.png
+RemoteTerminal.icns
