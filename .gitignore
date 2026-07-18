@@ -13,3 +13,4 @@ rpm/
 .vscode/
 data/hydroApps/**/__pycache__
 HyperBilibili/
+*.ico
