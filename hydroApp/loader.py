@@ -103,6 +103,40 @@ def _ensure_parent_packages(name: str):
             sys.modules[parent] = pkg
 
 
+def _extract_app_lib(app_name: str):
+    """解压 App 自带的 lib/*.whl 到 lib/ 目录，离线加载第三方库"""
+    lib_dir = os.path.join(APPS_DIR, app_name, 'lib')
+    if not os.path.isdir(lib_dir):
+        return
+    for fname in os.listdir(lib_dir):
+        if not fname.endswith('.whl'):
+            continue
+        whl_path = os.path.join(lib_dir, fname)
+        with zipfile.ZipFile(whl_path, 'r') as zf:
+            for member in zf.namelist():
+                if '.dist-info/' in member:
+                    continue
+                try:
+                    zf.extract(member, lib_dir)
+                except Exception:
+                    pass
+    if lib_dir not in sys.path:
+        sys.path.insert(0, lib_dir)
+    for fname in os.listdir(lib_dir):
+        if fname.endswith('.pth'):
+            pth_path = os.path.join(lib_dir, fname)
+            try:
+                with open(pth_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        sub = line.strip()
+                        if sub and not sub.startswith('#'):
+                            sub_path = os.path.join(lib_dir, sub)
+                            if os.path.isdir(sub_path) and sub_path not in sys.path:
+                                sys.path.insert(0, sub_path)
+            except Exception:
+                pass
+
+
 def load_module(name: str):
     path = get_app_path(name)
     if not path:
@@ -112,6 +146,7 @@ def load_module(name: str):
         if mod_name == name or mod_name.startswith(name + '.'):
             del sys.modules[mod_name]
     _ensure_parent_packages(name)
+    _extract_app_lib(name)
     spec = importlib.util.spec_from_file_location(name, os.path.join(path, '__init__.py'))
     if not spec or not spec.loader:
         return None
@@ -152,6 +187,7 @@ def install(zip_path: str):
             shutil.rmtree(target_path)
         os.makedirs(APPS_DIR, exist_ok=True)
         shutil.move(app_dir, target_path)
+        _extract_app_lib(target_name)
         shutil.rmtree(tmp)
         return target_name, None
     except Exception as e:
