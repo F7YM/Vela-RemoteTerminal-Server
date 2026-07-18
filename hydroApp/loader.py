@@ -191,7 +191,8 @@ def install(zip_path: str):
         os.makedirs(APPS_DIR, exist_ok=True)
         shutil.move(app_dir, target_path)
         _extract_app_lib(target_name)
-        shutil.rmtree(tmp)
+        if os.path.abspath(tmp) != os.path.abspath(app_dir):
+            shutil.rmtree(tmp)
         return target_name, None
     except Exception as e:
         return None, str(e)
