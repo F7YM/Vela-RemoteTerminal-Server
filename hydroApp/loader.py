@@ -165,11 +165,14 @@ def install(zip_path: str):
         # 找到含 __init__.py 的应用目录
         items = os.listdir(tmp)
         app_dir = None
-        for item in items:
-            candidate = os.path.join(tmp, item)
-            if os.path.isdir(candidate) and os.path.isfile(os.path.join(candidate, '__init__.py')):
-                app_dir = candidate
-                break
+        if os.path.isfile(os.path.join(tmp, '__init__.py')):
+            app_dir = tmp
+        else:
+            for item in items:
+                candidate = os.path.join(tmp, item)
+                if os.path.isdir(candidate) and os.path.isfile(os.path.join(candidate, '__init__.py')):
+                    app_dir = candidate
+                    break
         if not app_dir:
             shutil.rmtree(tmp)
             return None, "压缩包中未找到 HydroApp 目录"
