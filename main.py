@@ -1972,16 +1972,20 @@ def hydro_list():
 def hydro_activate_api():
     data = request.get_json(silent=True) or {}
     name = data.get('name', '')
+    print(f'[hydro_activate] name={name!r}', flush=True)
     if not name:
         return jsonify({"status": "error", "message": "缺少应用名称"}), 400
     try:
         mod = load_module(name)
+        print(f'[hydro_activate] mod={mod}, has_page={hasattr(mod, "page")}, has_handle={hasattr(mod, "handle")}', flush=True)
         if not mod or not hasattr(mod, 'page') or not hasattr(mod, 'handle'):
             return jsonify({"status": "error", "message": f"应用 {name} 无效"}), 400
         _activate_app(name)
         return jsonify({"status": "ok", "message": f"已激活 {name}"})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": f"{type(e).__name__}: {e}"}), 500
 
 
 @flask_app.route('/api/hydro/qr_image', methods=['GET'])

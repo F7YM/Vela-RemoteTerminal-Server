@@ -127,6 +127,7 @@ def _extract_app_lib(app_name: str):
                     pass
     if lib_dir not in sys.path:
         sys.path.insert(0, lib_dir)
+    print(f'[extract_lib] {app_name}: lib_dir={lib_dir}, on_path={lib_dir in sys.path}', flush=True)
     for fname in os.listdir(lib_dir):
         if fname.endswith('.pth'):
             pth_path = os.path.join(lib_dir, fname)
