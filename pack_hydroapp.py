@@ -212,9 +212,17 @@ def get_whl_from_tuna(
             }
         return None
     
+    # 从文件名解析版本元组，作为平局时取最高的 tiebreaker
+    def _ver_tuple(fname):
+        m = re.search(r'-(\d+)\.(\d+)\.(\d+)', fname) or re.search(r'-(\d+)\.(\d+)', fname)
+        if not m:
+            return (0, 0, 0)
+        parts = m.groups()
+        return (int(parts[0]), int(parts[1]), int(parts[2]) if len(parts) > 2 else 0)
+    
     # 打分匹配
     best = None
-    best_score = -1
+    best_key = None
     current_py_num = int(py_tag[2:])
     
     for whl_path in whl_links:
@@ -248,8 +256,10 @@ def get_whl_from_tuna(
         else:
             score += 20
         
-        if score > best_score:
-            best_score = score
+        ver = _ver_tuple(filename)
+        key = (score, ver)
+        if best_key is None or key > best_key:
+            best_key = key
             best = clean_path
     
     if best:
