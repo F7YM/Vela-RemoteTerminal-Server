@@ -277,28 +277,30 @@ def ai_summary_page(shape, data, bvid=""):
     btn_back = Button("", action="ai_summary_back", image=_icon("back"), bg="transparent", h=48, w=48, mt=8, data={"bvid": bvid})
 
     if not data:
-        body = [Text("无法加载", fs=18, clr="#f44336", mt=20)]
+        body = [Text("无法加载", fs=20, clr="#f44336", mt=20)]
     elif data.get("code") == -1:
-        body = [Text("该视频不支持 AI 摘要", fs=18, clr="#aaaaaa", mt=20)]
+        body = [Text("该视频不支持 AI 摘要", fs=20, clr="#aaaaaa", mt=20)]
     elif data.get("code") == 1:
-        body = [Text("暂无摘要（未识别语音）", fs=18, clr="#aaaaaa", mt=20)]
+        body = [Text("暂无摘要（未识别语音）", fs=20, clr="#aaaaaa", mt=20)]
     else:
         model = data.get("model_result", {})
         summary = model.get("summary", "")
         outline = model.get("outline", [])
-        body = [Text("AI 摘要", fs=22, clr="#ffffff", fw="bold", mt=4, ta="center")]
+        body = [Text("AI 摘要", fs=26, clr="#ffffff", fw="bold", mt=4, ta="center")]
         if summary:
-            body.append(Text(summary, fs=15, clr="#ffffff", mt=6))
+            body.append(Text(summary, fs=18, clr="#ffffff", mt=6))
         for sec in outline:
             t = sec.get("title", "")
             ts = sec.get("timestamp", 0)
             if t:
-                body.append(Text(f"[{ts//60}:{ts%60:02d}] {t}", fs=14, clr="#cccccc", mt=8))
+                body.append(Text(f"[{ts//60}:{ts%60:02d}] {t}", fs=16, clr="#cccccc", mt=8))
             for pt in sec.get("part_outline", []):
                 c, pts = pt.get("content", ""), pt.get("timestamp", 0)
                 if c:
-                    body.append(Text(f"  • {c}", fs=13, clr="#999999", mt=2))
+                    body.append(Text(f"  • {c}", fs=15, clr="#999999", mt=2))
 
     content = Column(btn_back, *body, props={"ai": "center"})
-    cs = safe_area_style(shape) + "; padding-left: 20px; padding-right: 20px"
+    cs = safe_area_style(shape)
+    if shape == "circle":
+        cs += "; padding-left: 60px; padding-right: 60px"
     return Page(content, content_style=cs)
