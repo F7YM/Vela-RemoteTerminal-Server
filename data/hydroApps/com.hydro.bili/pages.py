@@ -202,7 +202,7 @@ def video_detail(shape, video, liked=False, coined=False, stared=False):
         items.append(Text("", fs=1, mb=30))
     cs = safe_area_style(shape)
     if shape == "circle":
-        cs += "; padding-left: 60px; padding-right: 60px"
+        cs += "; padding-left: 60px; padding-right: 60px; padding-bottom: 46px"
     return Page(Column(*items), content_style=cs)
 
 
@@ -302,5 +302,5 @@ def ai_summary_page(shape, data, bvid=""):
     content = Column(btn_back, *body, props={"ai": "center"})
     cs = safe_area_style(shape)
     if shape == "circle":
-        cs += "; padding-left: 60px; padding-right: 60px"
+        cs += "; padding-left: 60px; padding-right: 60px; padding-bottom: 46px"
     return Page(content, content_style=cs)
