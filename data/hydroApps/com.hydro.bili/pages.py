@@ -29,9 +29,11 @@ def landing_page(shape, logged_in=False, mid=0, name=""):
     if logged_in:
         return home_page(shape, [], mid, name)
     return Page(
-        Text("HydroBili", fs=28, clr="#ffffff", fw="bold"),
-        Text("Bilibili 扫码登录", fs=16, clr="#aaaaaa", mt=6),
-        Button("扫码登录", action="generate", bg="#2196F3", w=240, h=50, br=25, mt=24, fs=18),
+        Column(
+            Text("HydroBili", fs=28, clr="#ffffff", fw="bold"),
+            Text("Bilibili 扫码登录", fs=16, clr="#aaaaaa", mt=6),
+            Button("扫码登录", action="generate", bg="#2196F3", w=240, h=50, br=25, mt=24, fs=18),
+        ),
         content_style=safe_area_style(shape),
     )
 
@@ -99,29 +101,31 @@ def home_page(shape, videos, mid, name):
     cs = safe_area_style(shape)
     if shape == "circle":
         cs += "; padding-left: 60px; padding-right: 60px; padding-bottom: 42px"
-    return Page(*items, content_style=cs)
+    return Page(Column(*items), content_style=cs)
 
 
 def tabs_page(shape):
     """Tab 切换页"""
     return Page(
-        Text("切换页面", fs=28, clr="#ffffff", fw="bold", mt=10),
-        Row(
-            Column(
-                Image(src=_icon("home"), w=60, h=60),
-                Text("首页", fs=18, clr="#ffffff", mt=6),
-                a="home",
-                props={"ai": "center"},
-                mr=40,
+        Column(
+            Text("切换页面", fs=28, clr="#ffffff", fw="bold", mt=10),
+            Row(
+                Column(
+                    Image(src=_icon("home"), w=60, h=60),
+                    Text("首页", fs=18, clr="#ffffff", mt=6),
+                    a="home",
+                    props={"ai": "center"},
+                    mr=40,
+                ),
+                Column(
+                    Image(src=_icon("person"), w=60, h=60),
+                    Text("我的", fs=18, clr="#ffffff", mt=6),
+                    a="mine",
+                    props={"ai": "center"},
+                    mr=40,
+                ),
+                props={"jc": "center", "ai": "center"},
             ),
-            Column(
-                Image(src=_icon("person"), w=60, h=60),
-                Text("我的", fs=18, clr="#ffffff", mt=6),
-                a="mine",
-                props={"ai": "center"},
-                mr=40,
-            ),
-            props={"jc": "center", "ai": "center"},
         ),
         content_style=safe_area_style(shape),
     )
@@ -141,7 +145,7 @@ def mine_page(shape, face, name):
     else:
         items.append(Text(name, fs=24, clr="#ffffff", mt=4))
     items.append(Button("退出登录", action="logout", bg="#f44336", w=220, h=48, br=24, mt=24, fs=22))
-    return Page(*items, content_style=safe_area_style(shape))
+    return Page(Column(*items), content_style=safe_area_style(shape))
 
 
 def video_detail(shape, video, liked=False, coined=False, stared=False):
@@ -198,7 +202,7 @@ def video_detail(shape, video, liked=False, coined=False, stared=False):
     cs = safe_area_style(shape)
     if shape == "circle":
         cs += "; padding-left: 60px; padding-right: 60px"
-    return Page(*items, content_style=cs)
+    return Page(Column(*items), content_style=cs)
 
 
 def audio_player_page(shape, meta, playing=False, bvid=""):
@@ -212,16 +216,18 @@ def audio_player_page(shape, meta, playing=False, bvid=""):
     if shape == "circle":
         cs += "; padding-left: 60px; padding-right: 60px"
     return Page(
-        Button("", action="_audiostop", image=_icon("back"), bg="transparent", h=48, w=48, mt=8),
-        Text(meta.get("title", ""), fs=24, clr="#ffffff", fw="bold", mt=20, ta="center"),
-        Text(meta.get("owner", ""), fs=18, clr="#aaaaaa", mt=4, ta="center"),
-        ProgressText(init_prog, fs=22, clr="#ffffff", mt=20),
-        Row(
-            Button("", action="_audiovoldown", image=_icon("audio_vol_down"), bg="transparent", h=56, w=56, img_size=56),
-            Button("", action="_audioplaypause", image=_icon(play_icon), bg="transparent", h=72, w=72, img_size=72, ml=20, mr=20),
-            Button("", action="_audiovolup", image=_icon("audio_vol_up"), bg="transparent", h=56, w=56, img_size=56),
-            props={"jc": "center", "ai": "center"},
-            mt=30,
+        Column(
+            Button("", action="_audiostop", image=_icon("back"), bg="transparent", h=48, w=48, mt=8),
+            Text(meta.get("title", ""), fs=24, clr="#ffffff", fw="bold", mt=20, ta="center"),
+            Text(meta.get("owner", ""), fs=18, clr="#aaaaaa", mt=4, ta="center"),
+            ProgressText(init_prog, fs=22, clr="#ffffff", mt=20),
+            Row(
+                Button("", action="_audiovoldown", image=_icon("audio_vol_down"), bg="transparent", h=56, w=56, img_size=56),
+                Button("", action="_audioplaypause", image=_icon(play_icon), bg="transparent", h=72, w=72, img_size=72, ml=20, mr=20),
+                Button("", action="_audiovolup", image=_icon("audio_vol_up"), bg="transparent", h=56, w=56, img_size=56),
+                props={"jc": "center", "ai": "center"},
+                mt=30,
+            ),
         ),
         content_style=cs,
     )
@@ -231,10 +237,12 @@ def qr_scan(shape, url, status="等待扫码..."):
     """扫码页面"""
     color = "#4CAF50" if "确认" in status else "#aaaaaa"
     return Page(
-        Button("", action="cancel", image=_icon("back"), bg="#555555", w=48, h=48, br=24),
-        Text("请使用 Bilibili App 扫码", fs=20, clr="#ffffff", fw="bold", mt=12),
-        QRCode(data=url, w=280, h=280, mt=14),
-        Text(status, fs=18, clr=color, mt=12),
+        Column(
+            Button("", action="cancel", image=_icon("back"), bg="#555555", w=48, h=48, br=24),
+            Text("请使用 Bilibili App 扫码", fs=20, clr="#ffffff", fw="bold", mt=12),
+            QRCode(data=url, w=280, h=280, mt=14),
+            Text(status, fs=18, clr=color, mt=12),
+        ),
         content_style=safe_area_style(shape),
     )
 
@@ -242,8 +250,10 @@ def qr_scan(shape, url, status="等待扫码..."):
 def expired(shape):
     """二维码已过期"""
     return Page(
-        Text("二维码已过期", fs=22, clr="#f44336", fw="bold"),
-        Button("重新生成", action="generate", bg="#2196F3", w=240, h=50, br=25, mt=24, fs=18),
+        Column(
+            Text("二维码已过期", fs=22, clr="#f44336", fw="bold"),
+            Button("重新生成", action="generate", bg="#2196F3", w=240, h=50, br=25, mt=24, fs=18),
+        ),
         content_style=safe_area_style(shape),
     )
 
@@ -251,10 +261,12 @@ def expired(shape):
 def success(shape, mid, name):
     """登录成功"""
     return Page(
-        Text("登录成功!", fs=26, clr="#4CAF50", fw="bold"),
-        Text(f"UID: {mid}", fs=18, clr="#ffffff", mt=6),
-        Text(name, fs=20, clr="#ffffff", mt=4),
-        Text("Cookie 已存储到手表", fs=16, clr="#aaaaaa", mt=8),
+        Column(
+            Text("登录成功!", fs=26, clr="#4CAF50", fw="bold"),
+            Text(f"UID: {mid}", fs=18, clr="#ffffff", mt=6),
+            Text(name, fs=20, clr="#ffffff", mt=4),
+            Text("Cookie 已存储到手表", fs=16, clr="#aaaaaa", mt=8),
+        ),
         content_style=safe_area_style(shape),
     )
 
