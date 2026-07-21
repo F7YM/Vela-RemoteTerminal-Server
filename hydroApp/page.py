@@ -3,9 +3,9 @@ def safe_area_style(shape: str = "") -> str:
     if not shape:
         return ""
     if shape == "circle":
-        return "padding: 0 30px 40px; margin-top: 40px"
+        return "padding: 40px 30px"
     if shape in ("rect", "pill-shaped"):
-        return "margin-top: 40px"
+        return "padding-top: 40px"
     return ""
 
 
