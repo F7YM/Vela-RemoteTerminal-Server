@@ -101,7 +101,7 @@ def home_page(shape, videos, mid, name):
                 items.append(Button(title, action=f"video_detail_{i}", bg="transparent", fs=13, ta="left", mt=10, mb=8))
     cs = safe_area_style(shape)
     if shape == "circle":
-        cs += "; padding-left: 60px; padding-right: 60px; padding-bottom: 42px"
+        cs += "; padding-left: 60px; padding-right: 60px; padding-bottom: 46px"
     return Page(Column(*items), content_style=cs)
 
 
