@@ -95,9 +95,10 @@ def home_page(shape, videos, mid, name):
                     Image(src=pic + "@120w_80h", w=120, h=80, br=8, of="cover"),
                     Button(title, action=f"video_detail_{i}", bg="transparent", fs=13, ta="left"),
                     props={"jc": "flex-start", "ai": "flex-start"},
+                    mb=8,
                 ))
             else:
-                items.append(Button(title, action=f"video_detail_{i}", bg="transparent", fs=13, ta="left", mt=10))
+                items.append(Button(title, action=f"video_detail_{i}", bg="transparent", fs=13, ta="left", mt=10, mb=8))
     cs = safe_area_style(shape)
     if shape == "circle":
         cs += "; padding-left: 60px; padding-right: 60px; padding-bottom: 42px"
